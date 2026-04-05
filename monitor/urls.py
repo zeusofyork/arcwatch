@@ -1,6 +1,7 @@
 from django.urls import path
 
-from monitor.rest_api import gpu_fleet_dashboard, ingest_gpu
+from monitor.rest_api import ingest_gpu
+from monitor.views.dashboard_views import gpu_fleet_dashboard
 
 app_name = 'monitor'
 

@@ -1,0 +1,185 @@
+{% extends "monitor/base.html" %}
+
+{% block title %}Fleet Dashboard{% endblock %}
+
+{% block nav_fleet %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+.util-band-strip{
+  display:flex;align-items:center;gap:10px;
+  font-size:.75rem;color:var(--text-dim);
+}
+.util-band-dot{
+  width:10px;height:10px;border-radius:50%;display:inline-block;
+}
+.util-band-dot.hi {background:#f87171}
+.util-band-dot.mid{background:#fbbf24}
+.util-band-dot.ok {background:#4ade80}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <h1>
+    <span class="icon"><i class="fas fa-server"></i></span>
+    GPU Fleet
+    {% if total_gpus > 0 %}
+    <span class="badge">{{ total_gpus }} GPU{{ total_gpus|pluralize }}</span>
+    {% endif %}
+  </h1>
+  <p>Real-time utilization, memory, temperature and power for every GPU in the fleet.</p>
+</div>
+
+{% if total_gpus == 0 %}
+<!-- ── Empty state ── -->
+<div class="empty-state">
+  <div class="empty-state-icon">
+    <i class="fas fa-microchip"></i>
+  </div>
+  <div class="empty-state-title">No GPU data yet</div>
+  <div class="empty-state-desc">
+    The fleet is empty. Run the demo data seeder to populate GPUs, nodes, and historical metrics so you can explore the dashboard.
+  </div>
+  <div class="empty-state-cmd">
+    python manage.py seed_demo_data --nodes 4 --gpus-per-node 4 --hours 6
+  </div>
+</div>
+
+{% else %}
+
+<!-- ── KPI stat strip ── -->
+<div class="stat-strip">
+
+  <div class="stat-tile">
+    <div class="stat-label"><i class="fas fa-microchip"></i> Total GPUs</div>
+    <div class="stat-value big">{{ total_gpus }}</div>
+    <div class="stat-sub">{{ active_count }} active</div>
+    <i class="fas fa-server stat-icon"></i>
+  </div>
+
+  <div class="stat-tile {% if avg_utilization and avg_utilization > 75 %}danger{% elif avg_utilization and avg_utilization > 50 %}warn{% endif %}">
+    <div class="stat-label"><i class="fas fa-chart-bar"></i> Avg Utilization</div>
+    <div class="stat-value big">
+      {% if avg_utilization is not None %}{{ avg_utilization }}%{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">
+      <span class="util-band-strip">
+        <span class="util-band-dot hi"></span>{{ util_high_count }} high
+        <span class="util-band-dot mid"></span>{{ util_mid_count }} mid
+        <span class="util-band-dot ok"></span>{{ util_low_count }} low
+      </span>
+    </div>
+    <i class="fas fa-tachometer-alt stat-icon"></i>
+  </div>
+
+  <div class="stat-tile accent2">
+    <div class="stat-label"><i class="fas fa-memory"></i> VRAM Used</div>
+    <div class="stat-value">{{ vram_used_gb }}<span style="font-size:1rem;color:var(--text-dim)"> / {{ vram_total_gb }} GB</span></div>
+    <div class="stat-sub">{{ vram_pct }}% consumed</div>
+    <i class="fas fa-memory stat-icon"></i>
+  </div>
+
+  <div class="stat-tile {% if avg_temperature and avg_temperature > 80 %}danger{% elif avg_temperature and avg_temperature > 65 %}warn{% endif %}">
+    <div class="stat-label"><i class="fas fa-thermometer-half"></i> Avg Temperature</div>
+    <div class="stat-value big">
+      {% if avg_temperature is not None %}{{ avg_temperature }}&deg;C{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">junction temperature</div>
+    <i class="fas fa-thermometer-half stat-icon"></i>
+  </div>
+
+  {% if fleet_cost_hr is not None %}
+  <div class="stat-tile warn">
+    <div class="stat-label"><i class="fas fa-dollar-sign"></i> Fleet Cost/hr</div>
+    <div class="stat-value big">${{ fleet_cost_hr }}</div>
+    <div class="stat-sub">~${{ fleet_cost_hr|floatformat:0 }}/hr all nodes</div>
+    <i class="fas fa-coins stat-icon"></i>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ── GPU card grid ── -->
+<div class="section-header">
+  <div class="section-title">
+    <i class="fas fa-microchip" style="color:var(--accent)"></i>
+    GPU Devices
+  </div>
+</div>
+
+<div class="card-grid">
+  {% for entry in gpus %}
+  {% with gpu=entry.obj %}
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">{{ gpu.node.hostname }}:<span style="color:var(--accent)">GPU{{ gpu.gpu_index }}</span></div>
+        <div class="card-subtitle">{{ gpu.node.gpu_type|default:"GPU" }}</div>
+      </div>
+      <span class="card-status status-{{ gpu.status }}">
+        {{ gpu.get_status_display }}
+      </span>
+    </div>
+
+    <div class="metric-rows">
+
+      {% if gpu.current_utilization is not None %}
+      <div class="metric-row">
+        <span class="metric-label"><i class="fas fa-chart-bar"></i> Utilization</span>
+        <span class="metric-val {{ entry.util_class }}">{{ entry.util_pct }}%</span>
+      </div>
+      {% endif %}
+
+      {% if gpu.current_memory_used_mb is not None %}
+      <div class="metric-row">
+        <span class="metric-label"><i class="fas fa-memory"></i> VRAM</span>
+        <span class="metric-val">{{ entry.mem_used_gb }} / {{ entry.mem_total_gb }} GB</span>
+      </div>
+      {% endif %}
+
+      {% if gpu.current_temperature_c is not None %}
+      <div class="metric-row">
+        <span class="metric-label"><i class="fas fa-thermometer-half"></i> Temp</span>
+        <span class="metric-val {{ entry.temp_class }}">{{ gpu.current_temperature_c }}&deg;C</span>
+      </div>
+      {% endif %}
+
+      {% if gpu.current_power_watts is not None %}
+      <div class="metric-row">
+        <span class="metric-label"><i class="fas fa-bolt"></i> Power</span>
+        <span class="metric-val">{{ gpu.current_power_watts|floatformat:0 }} W</span>
+      </div>
+      {% endif %}
+
+    </div>
+
+    {% if gpu.current_model_name %}
+    <div class="model-tag">
+      <i class="fas fa-brain"></i>
+      {{ gpu.current_model_name }}
+    </div>
+    {% endif %}
+
+    {% if gpu.current_utilization is not None %}
+    <div class="util-bar-wrap">
+      <div class="util-bar-label">
+        <span>Utilization</span>
+        <span>{{ entry.util_pct }}%</span>
+      </div>
+      <div class="util-bar">
+        <div class="util-bar-fill {{ entry.util_class }}" style="width:{{ entry.util_pct }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+{% endif %}{# end total_gpus > 0 #}
+
+{% endblock %}

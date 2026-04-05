@@ -1,0 +1,84 @@
+/*
+ * GPUWatch color utility classes
+ * Complement the inline design system in base.html
+ */
+
+/* ── Text color utilities ── */
+.text-accent   { color: var(--accent); }
+.text-accent2  { color: var(--accent2); }
+.text-bright   { color: var(--text-bright); }
+.text-dim      { color: var(--text-dim); }
+.text-warn     { color: var(--warn); }
+.text-danger   { color: var(--danger); }
+.text-grade-a  { color: var(--grade-a); }
+.text-grade-c  { color: var(--grade-c); }
+.text-grade-f  { color: var(--grade-f); }
+
+/* ── Background utilities ── */
+.bg-surface    { background: var(--surface); }
+.bg-surface2   { background: var(--surface2); }
+.bg-accent     { background: var(--accent); color: #0f172a; }
+.bg-accent2    { background: var(--accent2); color: #0f172a; }
+
+/* ── Utilization color helpers ── */
+.util-high  { color: #f87171; }
+.util-mid   { color: #fbbf24; }
+.util-low   { color: #4ade80; }
+.util-ok    { color: var(--accent); }
+
+/* ── Border utilities ── */
+.border-accent  { border-color: var(--accent) !important; }
+.border-accent2 { border-color: var(--accent2) !important; }
+
+/* ── Monospace numbers ── */
+.mono { font-family: var(--mono); }
+.mono-sm { font-family: var(--mono); font-size: 0.8rem; }
+
+/* ── Heading font ── */
+.head { font-family: var(--head); }
+.head-upper {
+  font-family: var(--head);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 700;
+}
+
+/* ── GPU-specific badge colors ── */
+.badge-nvidia {
+  background: rgba(118,185,0,.1);
+  border: 1px solid rgba(118,185,0,.25);
+  color: #76B900;
+}
+.badge-amd {
+  background: rgba(237,28,36,.1);
+  border: 1px solid rgba(237,28,36,.25);
+  color: #ED1C24;
+}
+.badge-intel {
+  background: rgba(0,118,215,.1);
+  border: 1px solid rgba(0,118,215,.25);
+  color: #0076D7;
+}
+
+/* ── Flicker animation for live indicators ── */
+@keyframes gpuFlicker {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+.live-flicker { animation: gpuFlicker 2.5s ease infinite; }
+
+/* ── Glow effect for accent elements ── */
+.glow-accent {
+  box-shadow: 0 0 12px rgba(118,185,0,.25), 0 0 4px rgba(118,185,0,.15);
+}
+.glow-accent2 {
+  box-shadow: 0 0 12px rgba(0,212,170,.25), 0 0 4px rgba(0,212,170,.15);
+}
+
+/* ── Responsive helpers ── */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 769px) {
+  .show-mobile { display: none !important; }
+}

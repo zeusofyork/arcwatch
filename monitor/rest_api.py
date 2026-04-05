@@ -7,7 +7,7 @@ No DRF required — responses are plain JSON.
 import json
 import logging
 
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -16,13 +16,6 @@ from monitor.models import GPUCluster
 from monitor.services.metric_ingestion import ingest_gpu_metrics
 
 logger = logging.getLogger(__name__)
-
-
-# ── Dashboard placeholder ─────────────────────────────────────────────────────
-
-def gpu_fleet_dashboard(request):
-    """Placeholder view for the GPU fleet dashboard (implemented in a later task)."""
-    return HttpResponse("GPU Fleet Dashboard — coming soon.")
 
 
 # ── Ingest endpoint ───────────────────────────────────────────────────────────
