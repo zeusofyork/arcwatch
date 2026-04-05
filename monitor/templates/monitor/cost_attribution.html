@@ -1,0 +1,243 @@
+{% extends "monitor/base.html" %}
+
+{% block title %}Cost Attribution{% endblock %}
+
+{% block nav_costs %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+.cost-table-wrap { overflow-x:auto; margin-bottom:32px; }
+.cost-table {
+  width:100%;border-collapse:collapse;font-size:.82rem;
+}
+.cost-table th {
+  font-family:var(--head);font-size:.7rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  white-space:nowrap;text-align:left;
+}
+.cost-table td {
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  color:var(--text);vertical-align:middle;
+}
+.cost-table tr:last-child td { border-bottom:none; }
+.cost-table tr:hover td { background:rgba(255,255,255,.02); }
+.cost-table td.mono { font-family:var(--mono);font-size:.8rem; }
+.eff-bar {
+  display:flex;align-items:center;gap:8px;
+}
+.eff-bar-track {
+  flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;min-width:60px;
+}
+.eff-bar-fill {
+  height:100%;border-radius:3px;
+}
+.eff-hi  { background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+.eff-mid { background:linear-gradient(90deg,#d97706,#fbbf24); }
+.eff-lo  { background:linear-gradient(90deg,#f97316,#f87171); }
+.pricing-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:10px;margin-bottom:32px;
+}
+.pricing-card {
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:14px 16px;
+}
+.pricing-card-top {
+  font-family:var(--mono);font-size:.72rem;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;
+}
+.pricing-card-rate {
+  font-family:var(--mono);font-size:1.4rem;color:var(--text-bright);
+}
+.pricing-card-type {
+  font-size:.68rem;color:var(--text-dim);margin-top:3px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <h1>
+    <span class="icon"><i class="fas fa-dollar-sign"></i></span>
+    Cost Attribution
+  </h1>
+  <p>GPU spend breakdown by model, node, and waste analysis for the last 24 hours.</p>
+</div>
+
+<!-- ── KPI stat strip ── -->
+<div class="stat-strip">
+
+  <div class="stat-tile warn">
+    <div class="stat-label"><i class="fas fa-coins"></i> Total Cost Today</div>
+    <div class="stat-value big">
+      ${% if total_cost %}{{ total_cost|floatformat:2 }}{% else %}0.00{% endif %}
+    </div>
+    <div class="stat-sub">last 24 hours</div>
+    <i class="fas fa-dollar-sign stat-icon"></i>
+  </div>
+
+  <div class="stat-tile">
+    <div class="stat-label"><i class="fas fa-tachometer-alt"></i> Current Cost/hr</div>
+    <div class="stat-value big">
+      ${% if cost_per_hour %}{{ cost_per_hour|floatformat:2 }}{% else %}0.00{% endif %}
+    </div>
+    <div class="stat-sub">live burn rate</div>
+    <i class="fas fa-fire stat-icon"></i>
+  </div>
+
+  <div class="stat-tile {% if waste_pct > 40 %}danger{% elif waste_pct > 20 %}warn{% endif %}">
+    <div class="stat-label"><i class="fas fa-trash-alt"></i> Total Waste</div>
+    <div class="stat-value big">
+      ${% if total_waste %}{{ total_waste|floatformat:2 }}{% else %}0.00{% endif %}
+    </div>
+    <div class="stat-sub">idle GPU spend</div>
+    <i class="fas fa-exclamation-triangle stat-icon"></i>
+  </div>
+
+  <div class="stat-tile {% if waste_pct > 40 %}danger{% elif waste_pct > 20 %}warn{% endif %}">
+    <div class="stat-label"><i class="fas fa-percentage"></i> Waste %</div>
+    <div class="stat-value big">{{ waste_pct }}%</div>
+    <div class="stat-sub">of total spend wasted</div>
+    <i class="fas fa-chart-pie stat-icon"></i>
+  </div>
+
+</div>
+
+{% if by_model %}
+<!-- ── Cost by model ── -->
+<div class="section-header">
+  <div class="section-title">
+    <i class="fas fa-brain" style="color:var(--accent)"></i>
+    Cost by Model
+  </div>
+</div>
+
+<div class="cost-table-wrap">
+  <table class="cost-table">
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th>GPU Hours</th>
+        <th>Total Cost</th>
+        <th>Waste</th>
+        <th>Efficiency</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in by_model %}
+      <tr>
+        <td>
+          <span style="font-family:var(--mono);font-size:.8rem;color:var(--text-bright)">
+            {{ row.model_name }}
+          </span>
+        </td>
+        <td class="mono">{{ row.gpu_hours|floatformat:1 }} hrs</td>
+        <td class="mono" style="color:var(--warn)">${{ row.total_cost|floatformat:4 }}</td>
+        <td class="mono" style="color:{% if row.total_waste > 0 %}#f87171{% else %}var(--text-dim){% endif %}">
+          ${{ row.total_waste|floatformat:4 }}
+        </td>
+        <td>
+          {% with eff=row.efficiency_pct %}
+          <div class="eff-bar">
+            <div class="eff-bar-track">
+              <div class="eff-bar-fill {% if eff >= 70 %}eff-hi{% elif eff >= 40 %}eff-mid{% else %}eff-lo{% endif %}"
+                   style="width:{{ eff }}%"></div>
+            </div>
+            <span class="mono" style="font-size:.72rem;color:{% if eff >= 70 %}var(--accent){% elif eff >= 40 %}#fbbf24{% else %}#f87171{% endif %}">
+              {{ eff }}%
+            </span>
+          </div>
+          {% endwith %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if by_node %}
+<!-- ── Cost by node ── -->
+<div class="section-header">
+  <div class="section-title">
+    <i class="fas fa-server" style="color:var(--accent)"></i>
+    Cost by Node
+  </div>
+</div>
+
+<div class="cost-table-wrap">
+  <table class="cost-table">
+    <thead>
+      <tr>
+        <th>Node</th>
+        <th>GPU Count</th>
+        <th>GPU Type</th>
+        <th>Hourly Rate</th>
+        <th>Avg Utilization</th>
+        <th>Total Cost</th>
+        <th>Waste</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in by_node %}
+      <tr>
+        <td>
+          <strong style="color:var(--text-bright);font-family:var(--mono);font-size:.8rem">
+            {{ row.node_name }}
+          </strong>
+        </td>
+        <td class="mono">{{ row.gpu_count }}</td>
+        <td style="font-size:.75rem;color:var(--text-dim)">{{ row.gpu_type|default:"—" }}</td>
+        <td class="mono">
+          {% if row.hourly_rate %}${{ row.hourly_rate|floatformat:2 }}/hr{% else %}—{% endif %}
+        </td>
+        <td>
+          {% with util=row.utilization_avg %}
+          <span class="mono {% if util > 60 %}metric-val hi{% elif util > 30 %}metric-val mid{% else %}metric-val ok{% endif %}">
+            {{ util }}%
+          </span>
+          {% endwith %}
+        </td>
+        <td class="mono" style="color:var(--warn)">${{ row.total_cost|floatformat:4 }}</td>
+        <td class="mono" style="color:{% if row.total_waste > 0 %}#f87171{% else %}var(--text-dim){% endif %}">
+          ${{ row.total_waste|floatformat:4 }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not by_model and not by_node %}
+<!-- ── Empty state ── -->
+<div class="empty-state">
+  <div class="empty-state-icon"><i class="fas fa-coins"></i></div>
+  <div class="empty-state-title">No cost data yet</div>
+  <div class="empty-state-desc">
+    Cost snapshots are written by the background Celery task every minute.
+    Run the demo data seeder to generate historical cost data.
+  </div>
+  <div class="empty-state-cmd">python manage.py seed_demo_data</div>
+</div>
+{% endif %}
+
+{% if pricing_entries %}
+<!-- ── GPU Pricing reference ── -->
+<div class="sec-label" style="margin-top:32px">GPU Pricing Reference</div>
+<div class="pricing-grid">
+  {% for p in pricing_entries %}
+  <div class="pricing-card">
+    <div class="pricing-card-top">{{ p.gpu_model_pattern }}{% if p.provider %} · {{ p.provider }}{% endif %}</div>
+    <div class="pricing-card-rate">${{ p.hourly_rate }}<span style="font-size:.75rem;color:var(--text-dim)">/hr</span></div>
+    <div class="pricing-card-type">{{ p.get_pricing_type_display }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

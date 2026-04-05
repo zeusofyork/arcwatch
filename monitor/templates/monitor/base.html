@@ -399,17 +399,17 @@ footer{
           </a>
         </div>
         <div class="nav-item">
-          <a href="#" class="{% block nav_inference %}{% endblock %}">
+          <a href="{% url 'monitor:inference_dashboard' %}" class="{% block nav_inference %}{% endblock %}">
             <i class="fas fa-brain"></i> Inference
           </a>
         </div>
         <div class="nav-item">
-          <a href="#" class="{% block nav_costs %}{% endblock %}">
+          <a href="{% url 'monitor:cost_dashboard' %}" class="{% block nav_costs %}{% endblock %}">
             <i class="fas fa-dollar-sign"></i> Costs
           </a>
         </div>
         <div class="nav-item">
-          <a href="#" class="{% block nav_alerts %}{% endblock %}">
+          <a href="{% url 'monitor:alerts_dashboard' %}" class="{% block nav_alerts %}{% endblock %}">
             <i class="fas fa-bell"></i> Alerts
           </a>
         </div>

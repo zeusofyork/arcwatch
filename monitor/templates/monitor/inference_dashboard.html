@@ -1,0 +1,178 @@
+{% extends "monitor/base.html" %}
+
+{% block title %}Inference Dashboard{% endblock %}
+
+{% block nav_inference %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+.status-serving  { background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#4ade80; }
+.status-loading  { background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:#fbbf24; }
+.status-idle     { background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);color:#60a5fa; }
+.status-error    { background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171; }
+.status-offline  { background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.25);color:#64748b; }
+
+.inf-table-wrap { overflow-x:auto; margin-bottom:32px; }
+.inf-table {
+  width:100%;border-collapse:collapse;font-size:.82rem;
+}
+.inf-table th {
+  font-family:var(--head);font-size:.7rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  white-space:nowrap;text-align:left;
+}
+.inf-table td {
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  color:var(--text);vertical-align:middle;
+}
+.inf-table tr:last-child td { border-bottom:none; }
+.inf-table tr:hover td { background:rgba(255,255,255,.02); }
+.inf-table td.mono { font-family:var(--mono);font-size:.78rem; }
+.engine-badge {
+  font-size:.65rem;font-family:var(--mono);font-weight:600;
+  padding:2px 7px;border-radius:4px;
+  background:rgba(118,185,0,.1);border:1px solid rgba(118,185,0,.2);
+  color:var(--accent);text-transform:uppercase;letter-spacing:.04em;
+}
+.latency-hi  { color:#f87171; }
+.latency-mid { color:#fbbf24; }
+.latency-ok  { color:#4ade80; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <h1>
+    <span class="icon"><i class="fas fa-brain"></i></span>
+    Inference Endpoints
+    {% if total_endpoints > 0 %}
+    <span class="badge">{{ total_endpoints }} endpoint{{ total_endpoints|pluralize }}</span>
+    {% endif %}
+  </h1>
+  <p>Real-time throughput, latency, and KV-cache utilization for all serving endpoints.</p>
+</div>
+
+{% if total_endpoints == 0 %}
+<!-- ── Empty state ── -->
+<div class="empty-state">
+  <div class="empty-state-icon"><i class="fas fa-brain"></i></div>
+  <div class="empty-state-title">No inference endpoints yet</div>
+  <div class="empty-state-desc">
+    No inference endpoints have been discovered or configured. Run the demo data seeder to populate sample endpoints.
+  </div>
+  <div class="empty-state-cmd">python manage.py seed_demo_data</div>
+</div>
+
+{% else %}
+
+<!-- ── KPI stat strip ── -->
+<div class="stat-strip">
+
+  <div class="stat-tile">
+    <div class="stat-label"><i class="fas fa-brain"></i> Total Endpoints</div>
+    <div class="stat-value big">{{ total_endpoints }}</div>
+    <div class="stat-sub">{{ serving_count }} serving{% if error_count %}, <span style="color:#f87171">{{ error_count }} error</span>{% endif %}</div>
+    <i class="fas fa-server stat-icon"></i>
+  </div>
+
+  <div class="stat-tile {% if avg_latency and avg_latency > 500 %}danger{% elif avg_latency and avg_latency > 200 %}warn{% endif %}">
+    <div class="stat-label"><i class="fas fa-stopwatch"></i> Avg Latency</div>
+    <div class="stat-value big">
+      {% if avg_latency is not None %}{{ avg_latency }}<span style="font-size:1rem;color:var(--text-dim)"> ms</span>{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">p50 across all endpoints</div>
+    <i class="fas fa-tachometer-alt stat-icon"></i>
+  </div>
+
+  <div class="stat-tile accent2">
+    <div class="stat-label"><i class="fas fa-bolt"></i> Total Tokens/sec</div>
+    <div class="stat-value big">
+      {% if total_tokens_per_sec is not None %}{{ total_tokens_per_sec|floatformat:0 }}{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">generation throughput</div>
+    <i class="fas fa-bolt stat-icon"></i>
+  </div>
+
+  <div class="stat-tile {% if avg_kv_cache_pct and avg_kv_cache_pct > 85 %}danger{% elif avg_kv_cache_pct and avg_kv_cache_pct > 70 %}warn{% endif %}">
+    <div class="stat-label"><i class="fas fa-database"></i> Avg KV Cache</div>
+    <div class="stat-value big">
+      {% if avg_kv_cache_pct is not None %}{{ avg_kv_cache_pct }}%{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">KV cache utilization</div>
+    <i class="fas fa-memory stat-icon"></i>
+  </div>
+
+</div>
+
+<!-- ── Endpoints table ── -->
+<div class="section-header">
+  <div class="section-title">
+    <i class="fas fa-list" style="color:var(--accent)"></i>
+    Endpoint Details
+  </div>
+</div>
+
+<div class="inf-table-wrap">
+  <table class="inf-table">
+    <thead>
+      <tr>
+        <th>Endpoint</th>
+        <th>Engine</th>
+        <th>Status</th>
+        <th>Model</th>
+        <th>Req/s</th>
+        <th>Tokens/s</th>
+        <th>Lat p50</th>
+        <th>Lat p99</th>
+        <th>Queue</th>
+        <th>KV Cache</th>
+        <th>Last Seen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ep in endpoints %}
+      <tr>
+        <td>
+          <strong style="color:var(--text-bright)">{{ ep.name }}</strong>
+          {% if ep.url %}<div style="font-size:.7rem;color:var(--text-dim);font-family:var(--mono)">{{ ep.url }}</div>{% endif %}
+        </td>
+        <td><span class="engine-badge">{{ ep.engine }}</span></td>
+        <td>
+          <span class="card-status status-{{ ep.status }}">{{ ep.get_status_display }}</span>
+        </td>
+        <td class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ ep.current_model|default:"—" }}
+        </td>
+        <td class="mono">
+          {% if ep.current_requests_per_sec is not None %}{{ ep.current_requests_per_sec|floatformat:1 }}{% else %}—{% endif %}
+        </td>
+        <td class="mono">
+          {% if ep.current_tokens_per_sec is not None %}{{ ep.current_tokens_per_sec|floatformat:0 }}{% else %}—{% endif %}
+        </td>
+        <td class="mono {% if ep.current_avg_latency_ms %}{% if ep.current_avg_latency_ms > 500 %}latency-hi{% elif ep.current_avg_latency_ms > 200 %}latency-mid{% else %}latency-ok{% endif %}{% endif %}">
+          {% if ep.current_avg_latency_ms is not None %}{{ ep.current_avg_latency_ms|floatformat:0 }} ms{% else %}—{% endif %}
+        </td>
+        <td class="mono {% if ep.current_p99_latency_ms %}{% if ep.current_p99_latency_ms > 1000 %}latency-hi{% elif ep.current_p99_latency_ms > 500 %}latency-mid{% else %}latency-ok{% endif %}{% endif %}">
+          {% if ep.current_p99_latency_ms is not None %}{{ ep.current_p99_latency_ms|floatformat:0 }} ms{% else %}—{% endif %}
+        </td>
+        <td class="mono">
+          {% if ep.current_queue_depth is not None %}{{ ep.current_queue_depth }}{% else %}—{% endif %}
+        </td>
+        <td class="mono {% if ep.current_kv_cache_usage_pct %}{% if ep.current_kv_cache_usage_pct > 85 %}latency-hi{% elif ep.current_kv_cache_usage_pct > 70 %}latency-mid{% else %}latency-ok{% endif %}{% endif %}">
+          {% if ep.current_kv_cache_usage_pct is not None %}{{ ep.current_kv_cache_usage_pct|floatformat:1 }}%{% else %}—{% endif %}
+        </td>
+        <td class="mono" style="font-size:.7rem;color:var(--text-dim)">
+          {{ ep.last_seen|date:"M j, H:i" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endif %}{# end total_endpoints > 0 #}
+
+{% endblock %}

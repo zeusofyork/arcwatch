@@ -1,0 +1,225 @@
+{% extends "monitor/base.html" %}
+
+{% block title %}Alerts{% endblock %}
+
+{% block nav_alerts %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+.alert-table-wrap { overflow-x:auto; margin-bottom:32px; }
+.alert-table {
+  width:100%;border-collapse:collapse;font-size:.82rem;
+}
+.alert-table th {
+  font-family:var(--head);font-size:.7rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  white-space:nowrap;text-align:left;
+}
+.alert-table td {
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  color:var(--text);vertical-align:middle;
+}
+.alert-table tr:last-child td { border-bottom:none; }
+.alert-table tr:hover td { background:rgba(255,255,255,.02); }
+.alert-table td.mono { font-family:var(--mono);font-size:.78rem; }
+
+/* Rule toggle display */
+.toggle-on {
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.68rem;font-family:var(--mono);font-weight:600;
+  padding:3px 10px;border-radius:12px;
+  background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);
+  color:#4ade80;
+}
+.toggle-off {
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.68rem;font-family:var(--mono);font-weight:600;
+  padding:3px 10px;border-radius:12px;
+  background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.25);
+  color:#64748b;
+}
+
+/* Severity badges */
+.sev-info     { background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);color:#60a5fa; }
+.sev-warning  { background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:#fbbf24; }
+.sev-critical { background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171; }
+
+.event-resolved { opacity:.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <h1>
+    <span class="icon"><i class="fas fa-bell"></i></span>
+    Alerts
+    {% if active_count > 0 %}
+    <span class="badge" style="background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.3);color:#f87171">
+      {{ active_count }} active
+    </span>
+    {% endif %}
+  </h1>
+  <p>Threshold-based alerting rules and recent alert events.</p>
+</div>
+
+<!-- ── KPI stat strip ── -->
+<div class="stat-strip">
+
+  <div class="stat-tile {% if active_count > 0 %}danger{% endif %}">
+    <div class="stat-label"><i class="fas fa-bell"></i> Active Alerts</div>
+    <div class="stat-value big">{{ active_count }}</div>
+    <div class="stat-sub">unresolved events</div>
+    <i class="fas fa-exclamation-circle stat-icon"></i>
+  </div>
+
+  <div class="stat-tile">
+    <div class="stat-label"><i class="fas fa-list-check"></i> Total Rules</div>
+    <div class="stat-value big">{{ total_rules }}</div>
+    <div class="stat-sub">{{ enabled_rules }} enabled</div>
+    <i class="fas fa-sliders stat-icon"></i>
+  </div>
+
+  <div class="stat-tile accent2">
+    <div class="stat-label"><i class="fas fa-history"></i> Recent Events</div>
+    <div class="stat-value big">{{ events|length }}</div>
+    <div class="stat-sub">last 50 events</div>
+    <i class="fas fa-clock stat-icon"></i>
+  </div>
+
+</div>
+
+{% if total_rules == 0 %}
+<!-- ── Empty state ── -->
+<div class="empty-state">
+  <div class="empty-state-icon"><i class="fas fa-bell-slash"></i></div>
+  <div class="empty-state-title">No alert rules configured</div>
+  <div class="empty-state-desc">
+    No alert rules have been set up yet. Run the demo data seeder to create sample rules.
+  </div>
+  <div class="empty-state-cmd">python manage.py seed_demo_data</div>
+</div>
+
+{% else %}
+
+<!-- ── Alert Rules ── -->
+<div class="section-header">
+  <div class="section-title">
+    <i class="fas fa-sliders" style="color:var(--accent)"></i>
+    Alert Rules
+  </div>
+</div>
+
+<div class="alert-table-wrap">
+  <table class="alert-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Metric</th>
+        <th>Threshold</th>
+        <th>Duration</th>
+        <th>Slack</th>
+        <th>Status</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rule in rules %}
+      <tr>
+        <td>
+          <strong style="color:var(--text-bright)">{{ rule.name }}</strong>
+        </td>
+        <td>
+          <span class="badge">{{ rule.get_metric_display }}</span>
+        </td>
+        <td class="mono">{{ rule.threshold_value|floatformat:1 }}</td>
+        <td class="mono">{{ rule.duration_seconds }}s</td>
+        <td>
+          {% if rule.slack_webhook_url %}
+            <span style="color:var(--accent2);font-size:.75rem"><i class="fab fa-slack"></i> configured</span>
+          {% else %}
+            <span style="color:var(--text-dim);font-size:.75rem">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if rule.is_enabled %}
+            <span class="toggle-on"><i class="fas fa-circle" style="font-size:.5rem"></i> ON</span>
+          {% else %}
+            <span class="toggle-off"><i class="far fa-circle" style="font-size:.5rem"></i> OFF</span>
+          {% endif %}
+        </td>
+        <td class="mono" style="font-size:.72rem;color:var(--text-dim)">
+          {{ rule.created_at|date:"M j, Y" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if events %}
+<!-- ── Recent Alert Events ── -->
+<div class="section-header">
+  <div class="section-title">
+    <i class="fas fa-history" style="color:var(--accent)"></i>
+    Recent Alert Events
+  </div>
+</div>
+
+<div class="alert-table-wrap">
+  <table class="alert-table">
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th>Severity</th>
+        <th>Message</th>
+        <th>Triggered</th>
+        <th>Resolved</th>
+        <th>Notification</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in events %}
+      <tr class="{% if event.resolved_at %}event-resolved{% endif %}">
+        <td>
+          <strong style="color:var(--text-bright)">{{ event.rule.name }}</strong>
+          <div style="font-size:.7rem;color:var(--text-dim)">{{ event.rule.get_metric_display }}</div>
+        </td>
+        <td>
+          <span class="card-status sev-{{ event.severity }}">{{ event.get_severity_display }}</span>
+        </td>
+        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem">
+          {{ event.message }}
+        </td>
+        <td class="mono" style="font-size:.72rem">{{ event.triggered_at|date:"M j, H:i" }}</td>
+        <td class="mono" style="font-size:.72rem">
+          {% if event.resolved_at %}
+            <span style="color:#4ade80">{{ event.resolved_at|date:"M j, H:i" }}</span>
+          {% else %}
+            <span style="color:#f87171">Active</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if event.notification_sent %}
+            <span style="color:#4ade80;font-size:.72rem"><i class="fas fa-check"></i> Sent</span>
+          {% else %}
+            <span style="color:var(--text-dim);font-size:.72rem">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:32px;color:var(--text-dim);font-size:.85rem">
+  <i class="fas fa-check-circle" style="color:#4ade80;margin-right:8px"></i>
+  No alert events have fired yet.
+</div>
+{% endif %}
+
+{% endif %}{# end total_rules > 0 #}
+
+{% endblock %}

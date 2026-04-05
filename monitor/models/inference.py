@@ -1,40 +1,75 @@
 """
 monitor/models/inference.py -- Inference serving endpoints and deployed models.
-
-Stub for Task 3-4. Full implementation in Task 6-7.
 """
 import uuid
 
 from django.db import models
+from django.utils import timezone
 
 from .base import TenantManager
 
 
 class InferenceEndpoint(models.Model):
     """
-    A vLLM / TGI / Triton serving endpoint.
+    A vLLM / TGI / Triton / Ollama serving endpoint.
     Discovered from agent's vLLM scraper or manually configured.
     """
-    FRAMEWORK_CHOICES = [
+    ENGINE_CHOICES = [
         ('vllm', 'vLLM'),
         ('tgi', 'Text Generation Inference'),
         ('triton', 'Triton Inference Server'),
-        ('trt-llm', 'TensorRT-LLM'),
+        ('ollama', 'Ollama'),
         ('custom', 'Custom'),
     ]
 
+    STATUS_CHOICES = [
+        ('serving', 'Serving'),
+        ('loading', 'Loading'),
+        ('idle', 'Idle'),
+        ('error', 'Error'),
+        ('offline', 'Offline'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Tenant / ownership
     organization = models.ForeignKey(
         'monitor.Organization', on_delete=models.CASCADE,
         related_name='inference_endpoints', db_index=True,
     )
-    name = models.CharField(max_length=255)
-    url = models.URLField(max_length=500, help_text='Metrics endpoint URL')
-    framework = models.CharField(
-        max_length=20, choices=FRAMEWORK_CHOICES, default='vllm',
+    team = models.ForeignKey(
+        'monitor.Team', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='inference_endpoints',
     )
+
+    # Identity
+    name = models.CharField(max_length=255)
+    engine = models.CharField(
+        max_length=20, choices=ENGINE_CHOICES, default='vllm',
+    )
+    url = models.URLField(max_length=500, blank=True, default='',
+                          help_text='Metrics/API endpoint URL')
+
+    # Model config
+    current_model = models.CharField(max_length=255, blank=True, default='')
+    quantization = models.CharField(max_length=64, blank=True, default='')
+    max_batch_size = models.IntegerField(null=True, blank=True)
+
+    # Current live metrics (denormalized snapshot updated on each scrape)
+    current_requests_per_sec = models.FloatField(null=True, blank=True)
+    current_tokens_per_sec = models.FloatField(null=True, blank=True)
+    current_avg_latency_ms = models.FloatField(null=True, blank=True)
+    current_p99_latency_ms = models.FloatField(null=True, blank=True)
+    current_queue_depth = models.IntegerField(null=True, blank=True)
+    current_kv_cache_usage_pct = models.FloatField(null=True, blank=True)
+    current_batch_utilization = models.FloatField(null=True, blank=True)
+
+    # Lifecycle
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default='idle', db_index=True,
+    )
+    last_seen = models.DateTimeField(default=timezone.now, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
-    last_scraped = models.DateTimeField(null=True, blank=True)
     labels = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -46,7 +81,8 @@ class InferenceEndpoint(models.Model):
         unique_together = [('organization', 'name')]
         indexes = [
             models.Index(fields=['organization', 'is_active']),
+            models.Index(fields=['organization', 'status']),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.framework})"
+        return f"{self.name} ({self.engine})"

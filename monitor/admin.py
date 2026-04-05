@@ -3,7 +3,11 @@ monitor/admin.py -- Django admin registrations for GPUWatch models.
 """
 from django.contrib import admin
 
-from .models import Organization, APIKey, Team, UserProfile, GPUCluster, GPUNode, GPU
+from .models import (
+    Organization, APIKey, Team, UserProfile,
+    GPUCluster, GPUNode, GPU,
+    InferenceEndpoint, GPUPricing, AlertRule, AlertEvent,
+)
 
 
 @admin.register(Organization)
@@ -56,3 +60,33 @@ class GPUAdmin(admin.ModelAdmin):
     list_filter = ('status', 'organization')
     search_fields = ('uuid', 'current_model_name', 'node__hostname')
     readonly_fields = ('uuid',)
+
+
+@admin.register(InferenceEndpoint)
+class InferenceEndpointAdmin(admin.ModelAdmin):
+    list_display = ('name', 'organization', 'engine', 'status', 'current_model', 'last_seen')
+    list_filter = ('engine', 'status', 'organization')
+    search_fields = ('name', 'current_model', 'url')
+    readonly_fields = ('id', 'created_at')
+
+
+@admin.register(GPUPricing)
+class GPUPricingAdmin(admin.ModelAdmin):
+    list_display = ('gpu_model_pattern', 'hourly_rate', 'provider', 'pricing_type', 'created_at')
+    list_filter = ('pricing_type', 'provider')
+    search_fields = ('gpu_model_pattern', 'provider')
+
+
+@admin.register(AlertRule)
+class AlertRuleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'organization', 'metric', 'threshold_value', 'duration_seconds', 'is_enabled')
+    list_filter = ('metric', 'is_enabled', 'organization')
+    search_fields = ('name',)
+
+
+@admin.register(AlertEvent)
+class AlertEventAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'rule', 'severity', 'triggered_at', 'resolved_at', 'notification_sent')
+    list_filter = ('severity', 'notification_sent', 'rule__organization')
+    search_fields = ('message',)
+    readonly_fields = ('triggered_at',)

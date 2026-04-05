@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from monitor.api_auth import authenticate_api_key
 from monitor.models import GPUCluster
 from monitor.services.metric_ingestion import ingest_gpu_metrics
+from monitor.services.inference_ingestion import ingest_inference_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,56 @@ def ingest_gpu(request):
         count = ingest_gpu_metrics(organization, cluster, payload)
     except Exception as exc:
         logger.exception("Metric ingestion failed: %s", exc)
+        return JsonResponse({"error": "Ingestion failed"}, status=500)
+
+    return JsonResponse({"status": "ok", "ingested": count})
+
+
+# ── Inference ingest endpoint ─────────────────────────────────────────────────
+
+@csrf_exempt
+@require_POST
+def ingest_inference(request):
+    """
+    POST /api/v1/ingest/inference/
+
+    Accept a JSON payload from the inference scraper and persist metrics.
+
+    Required header:
+        X-API-Key: <key with 'ingest' scope>
+
+    Request body (JSON):
+        {
+            "endpoint_name": "llama-70b",
+            "model_name":    "meta-llama/Llama-3.1-70B",
+            "engine":        "vllm",
+            "metrics": { ... }
+        }
+
+    Response (200):
+        { "status": "ok", "ingested": 1 }
+    """
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    api_key, err = authenticate_api_key(request)
+    if err:
+        return JsonResponse({"error": err}, status=401)
+
+    if "ingest" not in (api_key.scopes or []):
+        return JsonResponse({"error": "API key lacks 'ingest' scope"}, status=403)
+
+    # ── Parse body ────────────────────────────────────────────────────────────
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError) as exc:
+        return JsonResponse({"error": f"Invalid JSON: {exc}"}, status=400)
+
+    # ── Ingest ────────────────────────────────────────────────────────────────
+    try:
+        count = ingest_inference_metrics(api_key.organization, payload)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:
+        logger.exception("Inference metric ingestion failed: %s", exc)
         return JsonResponse({"error": "Ingestion failed"}, status=500)
 
     return JsonResponse({"status": "ok", "ingested": count})

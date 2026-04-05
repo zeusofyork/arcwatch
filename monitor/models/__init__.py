@@ -10,5 +10,11 @@ from .organization import Organization, Team, UserProfile, APIKey  # noqa: F401
 # GPU infrastructure
 from .gpu import GPUCluster, GPUNode, GPU  # noqa: F401
 
-# Inference (stub; full impl in Task 6-7)
+# Inference endpoints
 from .inference import InferenceEndpoint  # noqa: F401
+
+# Cost attribution
+from .cost import GPUPricing  # noqa: F401
+
+# Alerting
+from .alert import AlertRule, AlertEvent  # noqa: F401
