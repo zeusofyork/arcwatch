@@ -57,16 +57,31 @@ TEMPLATES = [
 WSGI_APPLICATION = 'gpuwatch.wsgi.application'
 
 # Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'gpuwatch'),
-        'USER': os.environ.get('POSTGRES_USER', 'gpuwatch'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'gpuwatch'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+# When USE_SQLITE=1 (e.g. local testing without Docker), use SQLite.
+if os.environ.get('USE_SQLITE', '0') == '1':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'gpuwatch'),
+            'USER': os.environ.get('POSTGRES_USER', 'gpuwatch'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'gpuwatch'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            # Use SQLite for the test runner even with PG config, so tests
+            # don't require a running Postgres instance.
+            'TEST': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            },
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
