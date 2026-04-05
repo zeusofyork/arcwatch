@@ -1,0 +1,83 @@
+"""
+monitor/rest_api.py
+
+Plain Django function-based REST API views.
+No DRF required — responses are plain JSON.
+"""
+import json
+import logging
+
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+from monitor.api_auth import authenticate_api_key
+from monitor.models import GPUCluster
+from monitor.services.metric_ingestion import ingest_gpu_metrics
+
+logger = logging.getLogger(__name__)
+
+
+# ── Dashboard placeholder ─────────────────────────────────────────────────────
+
+def gpu_fleet_dashboard(request):
+    """Placeholder view for the GPU fleet dashboard (implemented in a later task)."""
+    return HttpResponse("GPU Fleet Dashboard — coming soon.")
+
+
+# ── Ingest endpoint ───────────────────────────────────────────────────────────
+
+@csrf_exempt
+@require_POST
+def ingest_gpu(request):
+    """
+    POST /api/v1/ingest/gpu/
+
+    Accept a JSON payload from the GPU monitoring agent and persist metrics.
+
+    Required header:
+        X-API-Key: <key with 'ingest' scope>
+
+    Request body (JSON):
+        {
+            "cluster_name": "my-cluster",
+            "node_name": "gpu-node-01",
+            "gpu_type": "H100-SXM",
+            "metrics": [ { ... } ]
+        }
+
+    Response (200):
+        { "status": "ok", "ingested": <int> }
+    """
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    api_key, err = authenticate_api_key(request)
+    if err:
+        return JsonResponse({"error": err}, status=401)
+
+    if "ingest" not in (api_key.scopes or []):
+        return JsonResponse({"error": "API key lacks 'ingest' scope"}, status=403)
+
+    # ── Parse body ────────────────────────────────────────────────────────────
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError) as exc:
+        return JsonResponse({"error": f"Invalid JSON: {exc}"}, status=400)
+
+    cluster_name = payload.get("cluster_name", "default")
+    organization = api_key.organization
+
+    # ── Resolve / create cluster ──────────────────────────────────────────────
+    cluster, _ = GPUCluster.objects.get_or_create(
+        organization=organization,
+        name=cluster_name,
+        defaults={"cloud": "other"},
+    )
+
+    # ── Ingest ────────────────────────────────────────────────────────────────
+    try:
+        count = ingest_gpu_metrics(organization, cluster, payload)
+    except Exception as exc:
+        logger.exception("Metric ingestion failed: %s", exc)
+        return JsonResponse({"error": "Ingestion failed"}, status=500)
+
+    return JsonResponse({"status": "ok", "ingested": count})
