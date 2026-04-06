@@ -162,6 +162,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "monitor.sync_llm_usage",
         "schedule": 3600.0,  # every hour
     },
+    "sync-claude-code-usage": {
+        "task": "monitor.sync_claude_code_usage",
+        "schedule": 3600.0,  # every hour
+    },
 }
 
 # Logging

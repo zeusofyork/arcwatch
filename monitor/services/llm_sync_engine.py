@@ -213,6 +213,108 @@ ADAPTERS = {
 }
 
 
+# ── Claude Code adapter ───────────────────────────────────────────────────────
+
+class ClaudeCodeAdapter:
+    """
+    Fetches per-user daily Claude Code activity from the Anthropic Admin API.
+
+    Endpoint: GET /v1/organizations/usage_report/claude_code
+    Requires the same Admin API key (sk-ant-admin-…) as AnthropicAdapter.
+
+    Returns a list of dicts with keys:
+      date, user_email, customer_type,
+      sessions, lines_added, lines_removed, commits, prs,
+      input_tokens, output_tokens, cache_read_tokens, cost_usd
+    """
+    URL = "https://api.anthropic.com/v1/organizations/usage_report/claude_code"
+
+    def fetch(self, api_key: str, since_date: datetime.date, until_date: datetime.date) -> list:
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        }
+        starting_at = f"{since_date.isoformat()}T00:00:00Z"
+        ending_at = f"{(until_date + datetime.timedelta(days=1)).isoformat()}T00:00:00Z"
+
+        params: list = [
+            ("starting_at", starting_at),
+            ("ending_at", ending_at),
+            ("bucket_width", "1d"),
+            ("limit", 31),
+        ]
+
+        raw_buckets = []
+        while True:
+            resp = requests.get(self.URL, headers=headers, params=params, timeout=30)
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"Claude Code analytics API returned {resp.status_code}: {resp.text[:200]}"
+                )
+            body = resp.json()
+            raw_buckets.extend(body.get("data", []))
+            if not body.get("has_more", False):
+                break
+            next_page = body.get("next_page")
+            if not next_page:
+                break
+            params = [(k, v) for k, v in params if k != "page"] + [("page", next_page)]
+
+        records = []
+        for bucket in raw_buckets:
+            try:
+                day = datetime.date.fromisoformat(bucket["starting_at"][:10])
+            except (ValueError, KeyError):
+                continue
+            for result in bucket.get("results", []):
+                email = result.get("user_email") or result.get("email") or "unknown"
+
+                # Aggregate token counts across all models used that day
+                input_tok = output_tok = cache_read = 0
+                models_data = result.get("models") or result.get("model_breakdown") or {}
+                if isinstance(models_data, dict):
+                    for m in models_data.values():
+                        input_tok += int(m.get("input_tokens", 0))
+                        output_tok += int(m.get("output_tokens", 0))
+                        cache_read += int(
+                            m.get("cache_read_input_tokens", 0) or
+                            m.get("cache_read_tokens", 0)
+                        )
+                else:
+                    # Flat token fields as fallback
+                    input_tok = int(result.get("input_tokens", 0))
+                    output_tok = int(result.get("output_tokens", 0))
+                    cache_read = int(
+                        result.get("cache_read_input_tokens", 0) or
+                        result.get("cache_read_tokens", 0)
+                    )
+
+                records.append({
+                    "date": day,
+                    "user_email": email,
+                    "customer_type": result.get("customer_type", "api"),
+                    "sessions": int(result.get("num_sessions", result.get("sessions", 0))),
+                    "lines_added": int(
+                        result.get("lines_of_code_added", result.get("lines_added", 0))
+                    ),
+                    "lines_removed": int(
+                        result.get("lines_of_code_deleted", result.get("lines_removed", 0))
+                    ),
+                    "commits": int(result.get("num_commits", result.get("commits", 0))),
+                    "prs": int(result.get("num_prs", result.get("prs", 0))),
+                    "input_tokens": input_tok,
+                    "output_tokens": output_tok,
+                    "cache_read_tokens": cache_read,
+                    "cost_usd": float(
+                        result.get("cost_usd") or
+                        result.get("num_cost_estimate_usd") or
+                        result.get("estimated_cost_usd") or 0.0
+                    ),
+                })
+
+        return records
+
+
 # ── sync_provider ─────────────────────────────────────────────────────────────
 
 def sync_provider(provider_id: str) -> int:
@@ -275,4 +377,67 @@ def sync_llm_usage() -> int:
         except Exception as exc:
             logger.warning("LLM sync failed for provider %s (%s): %s", p.label, p.provider, exc)
     logger.info("sync_llm_usage: total %d records across %d providers", total, len(providers))
+    return total
+
+
+# ── sync_claude_code ──────────────────────────────────────────────────────────
+
+def sync_claude_code(provider_id: str) -> int:
+    """
+    Sync Claude Code usage for one Anthropic LLMProvider.
+    Returns the number of records upserted.
+    """
+    from django.utils import timezone
+    from monitor.models import LLMProvider, ClaudeCodeUsageRecord
+
+    provider = LLMProvider.objects.select_related("organization").get(pk=provider_id)
+    if not provider.is_active or provider.provider != "anthropic":
+        return 0
+
+    api_key = decrypt_api_key(provider.api_key_encrypted)
+    today = datetime.date.today()
+    since = today - datetime.timedelta(days=32)
+
+    adapter = ClaudeCodeAdapter()
+    raw_records = adapter.fetch(api_key, since, today)
+
+    count = 0
+    for r in raw_records:
+        ClaudeCodeUsageRecord.objects.update_or_create(
+            date=r["date"],
+            organization=provider.organization,
+            user_email=r["user_email"],
+            defaults={
+                "customer_type": r["customer_type"],
+                "sessions": r["sessions"],
+                "lines_added": r["lines_added"],
+                "lines_removed": r["lines_removed"],
+                "commits": r["commits"],
+                "prs": r["prs"],
+                "input_tokens": r["input_tokens"],
+                "output_tokens": r["output_tokens"],
+                "cache_read_tokens": r["cache_read_tokens"],
+                "cost_usd": r["cost_usd"],
+            },
+        )
+        count += 1
+
+    logger.info("sync_claude_code: %s wrote %d records", provider.label, count)
+    return count
+
+
+@shared_task(name="monitor.sync_claude_code_usage")
+def sync_claude_code_usage() -> int:
+    from monitor.models import LLMProvider
+    providers = list(
+        LLMProvider.objects.filter(is_active=True, provider="anthropic")
+        .select_related("organization")
+    )
+    total = 0
+    for p in providers:
+        try:
+            total += sync_claude_code(str(p.id))
+        except Exception as exc:
+            logger.warning("Claude Code sync failed for provider %s: %s", p.label, exc)
+    logger.info("sync_claude_code_usage: total %d records across %d providers", total, len(providers))
     return total

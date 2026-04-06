@@ -5,7 +5,7 @@ from monitor.views.dashboard_views import gpu_fleet_dashboard, landing
 from monitor.views.inference_views import inference_dashboard
 from monitor.views.cost_views import cost_dashboard
 from monitor.views.alert_views import alerts_dashboard
-from monitor.views.llm_views import llm_dashboard, llm_setup
+from monitor.views.llm_views import llm_dashboard, llm_setup, claude_code_dashboard
 from monitor.views.settings_views import (
     settings_root, settings_api_keys, settings_alert_rules,
     settings_resources, settings_members, revoke_api_key,
@@ -30,6 +30,7 @@ urlpatterns = [
     path('alerts/', alerts_dashboard, name='alerts_dashboard'),
     path('llm/', llm_dashboard, name='llm_dashboard'),
     path('llm/setup/', llm_setup, name='llm_setup'),
+    path('claude-code/', claude_code_dashboard, name='claude_code_dashboard'),
 
     # ── Settings views ────────────────────────────────────────────────────────
     path('settings/', settings_root, name='settings_root'),

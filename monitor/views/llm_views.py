@@ -6,7 +6,7 @@ import json
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
-from monitor.models import LLMUsageRecord, LLMProvider
+from monitor.models import LLMUsageRecord, LLMProvider, ClaudeCodeUsageRecord
 
 
 def _get_org(user):
@@ -143,4 +143,106 @@ def llm_setup(request):
     has_providers = org is not None and LLMProvider.objects.filter(organization=org).exists()
     return render(request, "monitor/llm_setup.html", {
         "has_providers": has_providers,
+    })
+
+
+@login_required
+def claude_code_dashboard(request):
+    org = _get_org(request.user)
+    today = datetime.date.today()
+    year, month = today.year, today.month
+    days_in_month = calendar.monthrange(year, month)[1]
+    days_elapsed = max(today.day, 1)
+
+    records = list(
+        ClaudeCodeUsageRecord.objects.filter(
+            organization=org,
+            date__year=year,
+            date__month=month,
+        )
+    ) if org else []
+
+    # ── KPI totals ────────────────────────────────────────────────────────────
+    total_sessions = sum(r.sessions for r in records)
+    total_lines_added = sum(r.lines_added for r in records)
+    total_commits = sum(r.commits for r in records)
+    total_prs = sum(r.prs for r in records)
+    total_cost = sum(float(r.cost_usd) for r in records)
+
+    projection = round(total_cost / days_elapsed * days_in_month, 4) if total_cost else 0
+
+    # ── Per-user breakdown ────────────────────────────────────────────────────
+    user_totals: dict = {}
+    for r in records:
+        if r.user_email not in user_totals:
+            user_totals[r.user_email] = {
+                "user_email": r.user_email,
+                "customer_type": r.customer_type,
+                "sessions": 0, "lines_added": 0, "lines_removed": 0,
+                "commits": 0, "prs": 0,
+                "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
+                "cost": 0.0,
+            }
+        d = user_totals[r.user_email]
+        d["sessions"] += r.sessions
+        d["lines_added"] += r.lines_added
+        d["lines_removed"] += r.lines_removed
+        d["commits"] += r.commits
+        d["prs"] += r.prs
+        d["input_tokens"] += r.input_tokens
+        d["output_tokens"] += r.output_tokens
+        d["cache_read_tokens"] += r.cache_read_tokens
+        d["cost"] += float(r.cost_usd)
+
+    by_user = sorted(user_totals.values(), key=lambda x: -x["sessions"])
+    for u in by_user:
+        u["cost"] = round(u["cost"], 4)
+
+    # ── Daily chart — sessions last 30 days ───────────────────────────────────
+    since_30 = today - datetime.timedelta(days=29)
+    daily_records = list(
+        ClaudeCodeUsageRecord.objects.filter(
+            organization=org,
+            date__gte=since_30,
+        )
+    ) if org else []
+
+    day_sessions: dict = {}
+    day_cost: dict = {}
+    for r in daily_records:
+        ds = r.date.isoformat()
+        day_sessions[ds] = day_sessions.get(ds, 0) + r.sessions
+        day_cost[ds] = day_cost.get(ds, 0.0) + float(r.cost_usd)
+
+    chart_labels = []
+    chart_sessions = []
+    chart_cost = []
+    d = since_30
+    while d <= today:
+        ds = d.isoformat()
+        chart_labels.append(d.strftime("%b %d"))
+        chart_sessions.append(day_sessions.get(ds, 0))
+        chart_cost.append(round(day_cost.get(ds, 0.0), 4))
+        d += datetime.timedelta(days=1)
+
+    # Check if we have an active Anthropic provider (for "Sync Now" option)
+    has_anthropic_provider = (
+        org is not None and
+        LLMProvider.objects.filter(organization=org, provider="anthropic", is_active=True).exists()
+    )
+
+    return render(request, "monitor/claude_code_dashboard.html", {
+        "total_sessions": total_sessions,
+        "total_lines_added": total_lines_added,
+        "total_commits": total_commits,
+        "total_prs": total_prs,
+        "total_cost": round(total_cost, 4),
+        "projection": projection,
+        "by_user": by_user,
+        "chart_labels": json.dumps(chart_labels),
+        "chart_sessions": json.dumps(chart_sessions),
+        "chart_cost": json.dumps(chart_cost),
+        "month_name": today.strftime("%B %Y"),
+        "has_anthropic_provider": has_anthropic_provider,
+        "has_data": bool(records),
     })

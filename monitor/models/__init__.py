@@ -20,4 +20,4 @@ from .cost import GPUPricing  # noqa: F401
 from .alert import AlertRule, AlertEvent  # noqa: F401
 
 # LLM API usage tracking
-from .llm import LLMProvider, LLMUsageRecord  # noqa: F401
+from .llm import LLMProvider, LLMUsageRecord, ClaudeCodeUsageRecord  # noqa: F401

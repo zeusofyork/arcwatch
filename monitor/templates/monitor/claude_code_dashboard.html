@@ -1,0 +1,278 @@
+{% extends "monitor/base.html" %}
+{% block title %}Claude Code Analytics{% endblock %}
+{% block nav_claude_code %}active{% endblock %}
+
+{% block content %}
+{% load humanize %}
+<div style="max-width:1200px;margin:0 auto;padding:32px 24px">
+
+  <!-- Page header -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2rem">
+    <div>
+      <div style="font-family:monospace;font-size:.68rem;color:#76B900;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem">
+        Claude Code
+      </div>
+      <h1 style="font-family:monospace;font-size:1.8rem;font-weight:800;
+                 color:#e2e8f0;text-transform:uppercase;letter-spacing:.04em;margin:0">
+        {{ month_name }}
+      </h1>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <a href="{% url 'monitor:llm_setup' %}"
+         style="font-family:monospace;font-size:.78rem;font-weight:600;color:#64748b;
+                text-transform:uppercase;letter-spacing:.06em;text-decoration:none;
+                border:1px solid #334155;padding:.35rem .9rem;border-radius:5px">
+        <i class="fa fa-question-circle" style="margin-right:.35rem"></i>Setup Guide
+      </a>
+      <a href="{% url 'monitor:settings_llm_providers' %}"
+         style="font-family:monospace;font-size:.78rem;font-weight:600;color:#64748b;
+                text-transform:uppercase;letter-spacing:.06em;text-decoration:none;
+                border:1px solid #334155;padding:.35rem .9rem;border-radius:5px">
+        <i class="fa fa-key" style="margin-right:.35rem"></i>Manage Keys
+      </a>
+    </div>
+  </div>
+
+  {% if not has_anthropic_provider %}
+  <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);
+              border-radius:8px;padding:1.25rem 1.5rem;margin-bottom:2rem">
+    <div style="font-family:monospace;font-size:.8rem;color:#f59e0b;font-weight:700;
+                text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">
+      Anthropic Admin Key Required
+    </div>
+    <p style="font-size:.85rem;color:#94a3b8;margin:0">
+      Claude Code analytics requires an Anthropic Admin key (sk-ant-admin-…).
+      <a href="{% url 'monitor:settings_llm_providers' %}" style="color:#76B900">Add one in Settings &rarr; LLM APIs</a>
+      and click Sync Now to load your team's activity.
+    </p>
+  </div>
+  {% endif %}
+
+  <!-- KPI cards -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:2rem">
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.62rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">
+        Sessions This Month
+      </div>
+      <div style="font-family:monospace;font-size:2rem;font-weight:800;color:#e2e8f0">
+        {{ total_sessions|intcomma }}
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.62rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">
+        Lines Added
+      </div>
+      <div style="font-family:monospace;font-size:2rem;font-weight:800;color:#76B900">
+        {{ total_lines_added|intcomma }}
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.62rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">
+        Commits
+      </div>
+      <div style="font-family:monospace;font-size:2rem;font-weight:800;color:#e2e8f0">
+        {{ total_commits|intcomma }}
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.62rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">
+        Pull Requests
+      </div>
+      <div style="font-family:monospace;font-size:2rem;font-weight:800;color:#e2e8f0">
+        {{ total_prs|intcomma }}
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.62rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">
+        Est. Cost
+        <span style="color:#64748b;font-size:.58rem">(proj. {{ projection }})</span>
+      </div>
+      <div style="font-family:monospace;font-size:2rem;font-weight:800;color:#76B900">
+        ${{ total_cost }}
+      </div>
+    </div>
+
+  </div>
+
+{{ chart_labels|json_script:"cc-chart-labels" }}
+{{ chart_sessions|json_script:"cc-chart-sessions" }}
+{{ chart_cost|json_script:"cc-chart-cost" }}
+
+  <!-- Charts row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem">
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.65rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem">
+        Daily Sessions — Last 30 Days
+      </div>
+      <canvas id="cc-sessions-chart" height="120"></canvas>
+    </div>
+
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.25rem">
+      <div style="font-family:monospace;font-size:.65rem;color:#64748b;
+                  text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem">
+        Daily Cost — Last 30 Days
+      </div>
+      <canvas id="cc-cost-chart" height="120"></canvas>
+    </div>
+
+  </div>
+
+  <!-- Per-user table -->
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:8px">
+    <div style="padding:.75rem 1.25rem;border-bottom:1px solid #334155">
+      <span style="font-family:monospace;font-weight:700;font-size:.95rem;
+                   color:#e2e8f0;text-transform:uppercase;letter-spacing:.05em">
+        By User — {{ month_name }}
+      </span>
+    </div>
+
+    {% if by_user %}
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid #334155">
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">User</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Plan</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Sessions</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Lines +/-</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Commits</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">PRs</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Input Tok</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Output Tok</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:monospace;
+                     font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Est. Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in by_user %}
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;color:#e2e8f0">
+            {{ u.user_email }}
+          </td>
+          <td style="padding:.65rem 1.25rem">
+            {% if u.customer_type == "subscription" %}
+            <span style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);
+                         color:#00d4aa;font-size:.62rem;padding:2px 7px;border-radius:10px;
+                         font-family:monospace">Max/Pro</span>
+            {% else %}
+            <span style="background:rgba(118,185,0,.08);border:1px solid rgba(118,185,0,.2);
+                         color:#76B900;font-size:.62rem;padding:2px 7px;border-radius:10px;
+                         font-family:monospace">API</span>
+            {% endif %}
+          </td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;
+                     color:#e2e8f0;text-align:right;font-weight:700">
+            {{ u.sessions|intcomma }}
+          </td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.72rem;
+                     text-align:right">
+            <span style="color:#4ade80">+{{ u.lines_added|intcomma }}</span>
+            <span style="color:#64748b"> / </span>
+            <span style="color:#f87171">-{{ u.lines_removed|intcomma }}</span>
+          </td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;
+                     color:#cbd5e1;text-align:right">{{ u.commits|intcomma }}</td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;
+                     color:#cbd5e1;text-align:right">{{ u.prs|intcomma }}</td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;
+                     color:#cbd5e1;text-align:right">{{ u.input_tokens|intcomma }}</td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;
+                     color:#cbd5e1;text-align:right">{{ u.output_tokens|intcomma }}</td>
+          <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.78rem;
+                     color:#76B900;text-align:right;font-weight:700">${{ u.cost }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:3rem;text-align:center;color:#64748b">
+      No Claude Code data for {{ month_name }}.
+      {% if has_anthropic_provider %}
+      Go to <a href="{% url 'monitor:settings_llm_providers' %}" style="color:#76B900">Settings &rarr; LLM APIs</a>
+      and click <strong>Sync Now</strong> on your Anthropic key.
+      {% else %}
+      <a href="{% url 'monitor:settings_llm_providers' %}" style="color:#76B900">Add an Anthropic Admin key</a>
+      to start syncing Claude Code activity.
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const labels = JSON.parse(document.getElementById('cc-chart-labels').textContent);
+  const sessions = JSON.parse(document.getElementById('cc-chart-sessions').textContent);
+  const cost = JSON.parse(document.getElementById('cc-chart-cost').textContent);
+
+  const chartOpts = (yCallback) => ({
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: yCallback } }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 },
+        grid: { color: 'rgba(255,255,255,0.04)' }
+      },
+      y: {
+        ticks: { color: '#64748b', font: { size: 10 } },
+        grid: { color: 'rgba(255,255,255,0.04)' }
+      }
+    }
+  });
+
+  const sc = document.getElementById('cc-sessions-chart');
+  if (sc) {
+    new Chart(sc, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ data: sessions, backgroundColor: 'rgba(118,185,0,0.7)', borderRadius: 2 }]
+      },
+      options: chartOpts(ctx => `${ctx.raw} sessions`)
+    });
+  }
+
+  const cc = document.getElementById('cc-cost-chart');
+  if (cc) {
+    new Chart(cc, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ data: cost, backgroundColor: 'rgba(0,212,170,0.7)', borderRadius: 2 }]
+      },
+      options: {
+        ...chartOpts(ctx => `$${ctx.raw.toFixed(4)}`),
+        scales: {
+          x: { ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

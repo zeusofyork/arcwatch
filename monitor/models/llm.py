@@ -66,3 +66,43 @@ class LLMUsageRecord(models.Model):
 
     def __str__(self):
         return f"{self.date} {self.provider}/{self.model} ${self.cost_usd}"
+
+
+class ClaudeCodeUsageRecord(models.Model):
+    """Daily per-user Claude Code activity pulled from the Anthropic Admin API."""
+
+    date = models.DateField(help_text="Calendar day (UTC) this record covers")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="claude_code_records"
+    )
+    user_email = models.CharField(max_length=254)
+    customer_type = models.CharField(
+        max_length=32, default="api",
+        help_text="'api' = pay-as-you-go, 'subscription' = Pro/Max plan"
+    )
+
+    # Developer productivity
+    sessions = models.IntegerField(default=0)
+    lines_added = models.IntegerField(default=0)
+    lines_removed = models.IntegerField(default=0)
+    commits = models.IntegerField(default=0)
+    prs = models.IntegerField(default=0)
+
+    # Token usage (aggregated across all models used that day)
+    input_tokens = models.BigIntegerField(default=0)
+    output_tokens = models.BigIntegerField(default=0)
+    cache_read_tokens = models.BigIntegerField(default=0)
+
+    # Cost (estimated by Anthropic in the API response)
+    cost_usd = models.DecimalField(max_digits=12, decimal_places=6, default=0)
+
+    class Meta:
+        unique_together = [("date", "organization", "user_email")]
+        ordering = ["-date", "user_email"]
+        verbose_name = "Claude Code Usage Record"
+        indexes = [
+            models.Index(fields=["organization", "date"], name="monitor_cc_organiz_date_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.date} {self.user_email} — {self.sessions} sessions"
