@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.utils import timezone
 
 from monitor.models import GPU, GPUCluster, GPUNode, Organization, AlertRule, AlertEvent, InferenceEndpoint
 
