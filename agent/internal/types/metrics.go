@@ -23,3 +23,23 @@ type NodePayload struct {
 	GPUType  string      `json:"gpu_type"`
 	Metrics  []GPUMetric `json:"metrics"`
 }
+
+// InferenceMetrics holds vLLM Prometheus metric values mapped to
+// the Django inference ingest schema.
+type InferenceMetrics struct {
+	RequestsRunning      float64 `json:"requests_running"`
+	RequestsWaiting      float64 `json:"requests_waiting"`
+	PromptThroughput     float64 `json:"prompt_throughput"`
+	GenerationThroughput float64 `json:"generation_throughput"`
+	GPUCacheUsage        float64 `json:"gpu_cache_usage"`
+	CPUCacheUsage        float64 `json:"cpu_cache_usage"`
+}
+
+// InferencePayload is the JSON body sent to POST /api/v1/ingest/inference/.
+type InferencePayload struct {
+	EndpointName string           `json:"endpoint_name"`
+	ModelName    string           `json:"model_name"`
+	Engine       string           `json:"engine"`
+	URL          string           `json:"url"`
+	Metrics      InferenceMetrics `json:"metrics"`
+}
