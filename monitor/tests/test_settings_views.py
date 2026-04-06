@@ -2,7 +2,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-from monitor.models import Organization, GPUCluster, GPUNode
+from monitor.models import Organization, GPUCluster, GPUNode, Invite
 
 
 def _make_user_and_org(username='admin', role='owner'):
@@ -17,7 +17,6 @@ def _make_user_and_org(username='admin', role='owner'):
 
 class InviteModelTest(TestCase):
     def test_invite_created_with_expiry(self):
-        from monitor.models import Invite
         user, org = _make_user_and_org('inviteadmin')
         invite = Invite.objects.create(
             organization=org,
@@ -28,6 +27,12 @@ class InviteModelTest(TestCase):
         self.assertIsNotNone(invite.token)
         self.assertFalse(invite.is_expired)
         self.assertFalse(invite.is_accepted)
+        import datetime as _dt
+        from django.utils import timezone as _tz
+        self.assertIsNotNone(invite.expires_at)
+        expected_expiry = _tz.now() + _dt.timedelta(days=7)
+        delta = abs((invite.expires_at - expected_expiry).total_seconds())
+        self.assertLess(delta, 5, "expires_at should be approximately 7 days from now")
 
     def test_is_active_on_cluster_and_node(self):
         user, org = _make_user_and_org('clusteradmin')

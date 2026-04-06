@@ -219,7 +219,8 @@ class Invite(models.Model):
         Organization, on_delete=models.CASCADE, related_name='invites',
     )
     invited_by = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='sent_invites',
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='sent_invites',
     )
     email = models.EmailField()
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='viewer')
@@ -229,13 +230,14 @@ class Invite(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        unique_together = [('organization', 'email')]
         indexes = [
             models.Index(fields=['organization', 'accepted_at']),
             models.Index(fields=['email']),
         ]
 
     def save(self, *args, **kwargs):
-        if not self.expires_at:
+        if self._state.adding and not self.expires_at:
             self.expires_at = timezone.now() + datetime.timedelta(days=7)
         super().save(*args, **kwargs)
 
@@ -244,6 +246,8 @@ class Invite(models.Model):
 
     @property
     def is_expired(self):
+        if self.expires_at is None:
+            return False
         return timezone.now() > self.expires_at
 
     @property
