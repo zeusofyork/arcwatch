@@ -1,0 +1,13 @@
+{% if rule.is_enabled %}
+<span id="toggle-{{ rule.id }}"
+      hx-post="/settings/alert-rules/{{ rule.id }}/toggle/"
+      hx-target="#toggle-{{ rule.id }}"
+      hx-swap="outerHTML"
+      style="display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-family:monospace;padding:3px 10px;border-radius:12px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#4ade80;cursor:pointer">● ON</span>
+{% else %}
+<span id="toggle-{{ rule.id }}"
+      hx-post="/settings/alert-rules/{{ rule.id }}/toggle/"
+      hx-target="#toggle-{{ rule.id }}"
+      hx-swap="outerHTML"
+      style="display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-family:monospace;padding:3px 10px;border-radius:12px;background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.25);color:#64748b;cursor:pointer">○ OFF</span>
+{% endif %}

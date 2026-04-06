@@ -173,3 +173,55 @@ class APIKeysPageTest(TestCase):
         api_key, _ = APIKey.create_key(self.org, self.admin, 'ToRevoke2', ['ingest'])
         response = self.client.post(f'/settings/api-keys/{api_key.id}/revoke/')
         self.assertEqual(response.status_code, 403)
+
+
+class AlertRulesPageTest(TestCase):
+    def setUp(self):
+        self.admin, self.org = _make_user_and_org('ar_admin', role='owner')
+        self.viewer = User.objects.create_user(username='ar_viewer', password='pw')
+        self.viewer.profile.organization = self.org
+        self.viewer.profile.role = 'viewer'
+        self.viewer.profile.save()
+        from monitor.models import AlertRule
+        self.rule = AlertRule.objects.create(
+            organization=self.org,
+            name='Test Rule',
+            metric='gpu_utilization_low',
+            threshold_value=20.0,
+            is_enabled=True,
+        )
+
+    def test_create_alert_rule(self):
+        self.client.login(username='ar_admin', password='pw')
+        response = self.client.post('/settings/alert-rules/create/', {
+            'name': 'New Rule',
+            'metric': 'gpu_offline',
+            'threshold_value': '0',
+            'duration_seconds': '300',
+            'slack_webhook_url': '',
+        })
+        self.assertEqual(response.status_code, 302)
+        from monitor.models import AlertRule
+        self.assertTrue(AlertRule.objects.filter(name='New Rule', organization=self.org).exists())
+
+    def test_create_alert_rule_viewer_gets_403(self):
+        self.client.login(username='ar_viewer', password='pw')
+        response = self.client.post('/settings/alert-rules/create/', {
+            'name': 'X', 'metric': 'gpu_offline', 'threshold_value': '0',
+            'duration_seconds': '300', 'slack_webhook_url': '',
+        })
+        self.assertEqual(response.status_code, 403)
+
+    def test_toggle_alert_rule(self):
+        self.client.login(username='ar_admin', password='pw')
+        response = self.client.post(f'/settings/alert-rules/{self.rule.id}/toggle/')
+        self.assertEqual(response.status_code, 200)
+        self.rule.refresh_from_db()
+        self.assertFalse(self.rule.is_enabled)
+
+    def test_delete_alert_rule(self):
+        self.client.login(username='ar_admin', password='pw')
+        response = self.client.post(f'/settings/alert-rules/{self.rule.id}/delete/')
+        self.assertEqual(response.status_code, 200)
+        from monitor.models import AlertRule
+        self.assertFalse(AlertRule.objects.filter(pk=self.rule.id).exists())

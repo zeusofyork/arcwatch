@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from monitor.decorators import is_htmx, require_admin
 from monitor.forms import APIKeyCreateForm, AlertRuleForm, InviteForm
-from monitor.models import APIKey, Invite
+from monitor.models import APIKey, AlertRule, Invite
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -94,6 +94,43 @@ def settings_alert_rules(request):
         'rules': org.alert_rules.all() if org else [],
         'form': AlertRuleForm(),
     })
+
+
+@login_required
+@require_admin
+def create_alert_rule(request):
+    if request.method != 'POST':
+        return redirect('/settings/alert-rules/')
+    org = _get_org(request.user)
+    form = AlertRuleForm(request.POST)
+    if form.is_valid():
+        rule = form.save(commit=False)
+        rule.organization = org
+        rule.save()
+    return redirect('/settings/alert-rules/')
+
+
+@login_required
+@require_admin
+def toggle_alert_rule(request, rule_id):
+    org = _get_org(request.user)
+    rule = get_object_or_404(AlertRule, pk=rule_id, organization=org)
+    if request.method == 'POST':
+        rule.is_enabled = not rule.is_enabled
+        rule.save(update_fields=['is_enabled'])
+    return render(request, 'monitor/fragments/alert_rule_toggle.html', {
+        'rule': rule, 'is_admin': True,
+    })
+
+
+@login_required
+@require_admin
+def delete_alert_rule(request, rule_id):
+    org = _get_org(request.user)
+    rule = get_object_or_404(AlertRule, pk=rule_id, organization=org)
+    if request.method == 'POST':
+        rule.delete()
+    return HttpResponse('')
 
 
 # ── Resources ─────────────────────────────────────────────────────────────────
