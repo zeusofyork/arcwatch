@@ -38,3 +38,5 @@ agent/gpuwatch-agent
 
 # Git worktrees
 .worktrees/
+.env.prod
+*.env.prod

@@ -1,0 +1,52 @@
+###############################################################################
+# ArcWatch — CI: Tests and SAST
+#
+# Triggers: every push and pull request
+# Tests run with SQLite in-memory (no external services needed)
+###############################################################################
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [master]
+
+env:
+  DJANGO_SETTINGS_MODULE: arcwatch.settings
+  USE_SQLITE: "1"
+  SECRET_KEY: ci-insecure-key-not-for-production
+  DEBUG: "False"
+  CI: "true"
+
+jobs:
+  test:
+    name: Django tests & SAST
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -q -r requirements.txt && pip install -q bandit
+
+      - name: Django system check
+        run: python manage.py check
+
+      - name: Apply migrations
+        run: python manage.py migrate --noinput
+
+      - name: Check for migration drift
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests
+        run: python manage.py test monitor.tests --verbosity=2
+
+      - name: SAST scan
+        run: bandit -r monitor/ arcwatch/ -ll -ii --skip B101 || true
