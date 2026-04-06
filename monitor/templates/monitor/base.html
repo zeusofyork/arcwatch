@@ -415,6 +415,11 @@ footer{
             <i class="fas fa-bell"></i> Alerts
           </a>
         </div>
+        <div class="nav-item">
+          <a href="{% url 'monitor:llm_dashboard' %}" class="{% block nav_llm %}{% endblock %}">
+            <i class="fas fa-robot"></i> LLM APIs
+          </a>
+        </div>
       </nav>
 
       <div class="nav-right">

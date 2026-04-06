@@ -334,3 +334,58 @@ class LLMProviderSettingsTest(TestCase):
             resp = self.client.post(f"/settings/llm-providers/{self.provider.pk}/sync/")
         self.assertEqual(resp.status_code, 302)
         self.assertIn("synced=5", resp["Location"])
+
+
+class LLMDashboardTest(TestCase):
+    def setUp(self):
+        self.org = _make_org("dash")
+        self.user = self.org.owner
+        self.user.profile.organization = self.org
+        self.user.profile.role = "owner"
+        self.user.profile.save()
+        self.client.force_login(self.user)
+        # Seed two usage records
+        today = datetime.date.today()
+        LLMUsageRecord.objects.create(
+            date=today.replace(day=1),
+            organization=self.org,
+            provider="anthropic",
+            model="claude-3-5-sonnet-20241022",
+            input_tokens=100000,
+            output_tokens=5000,
+            cache_creation_tokens=2000,
+            cache_read_tokens=80000,
+            request_count=42,
+            cost_usd="3.50",
+        )
+        LLMUsageRecord.objects.create(
+            date=today.replace(day=1),
+            organization=self.org,
+            provider="openai",
+            model="gpt-4o",
+            input_tokens=50000,
+            output_tokens=3000,
+            cache_creation_tokens=0,
+            cache_read_tokens=0,
+            request_count=20,
+            cost_usd="1.50",
+        )
+
+    def test_dashboard_returns_200(self):
+        resp = self.client.get("/llm/")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_dashboard_shows_total_cost(self):
+        resp = self.client.get("/llm/")
+        self.assertContains(resp, "5.00")  # 3.50 + 1.50
+
+    def test_dashboard_shows_model_names(self):
+        resp = self.client.get("/llm/")
+        self.assertContains(resp, "claude-3-5-sonnet-20241022")
+        self.assertContains(resp, "gpt-4o")
+
+    def test_unauthenticated_redirects_to_login(self):
+        self.client.logout()
+        resp = self.client.get("/llm/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/accounts/login/", resp["Location"])
