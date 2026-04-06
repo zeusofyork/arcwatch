@@ -2,7 +2,7 @@
 monitor/views/settings_views.py -- Settings management views (API Keys, Alert Rules, Resources, Members).
 """
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
 from monitor.decorators import is_htmx, require_admin
@@ -45,7 +45,6 @@ def settings_api_keys(request):
 
     if request.method == 'POST':
         if not is_admin:
-            from django.http import HttpResponseForbidden
             return HttpResponseForbidden("Admin access required.")
         form = APIKeyCreateForm(request.POST)
         if form.is_valid():
