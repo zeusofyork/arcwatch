@@ -133,6 +133,17 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+CELERY_BEAT_SCHEDULE = {
+    "compute-cost-snapshot": {
+        "task": "monitor.compute_cost_snapshot",
+        "schedule": 60.0,
+    },
+    "evaluate-alert-rules": {
+        "task": "monitor.evaluate_alert_rules",
+        "schedule": 60.0,
+    },
+}
+
 # Logging
 LOGGING = {
     'version': 1,
