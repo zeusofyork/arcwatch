@@ -59,3 +59,48 @@ class AuthRedirectTest(TestCase):
     def test_login_page_renders(self):
         response = self.client.get('/accounts/login/')
         self.assertEqual(response.status_code, 200)
+
+
+class DecoratorTest(TestCase):
+    def setUp(self):
+        self.admin, self.org = _make_user_and_org('dec_admin', role='owner')
+        self.viewer = User.objects.create_user(username='dec_viewer', password='pw')
+        self.viewer.profile.organization = self.org
+        self.viewer.profile.role = 'viewer'
+        self.viewer.profile.save()
+
+    def test_require_admin_allows_admin(self):
+        from monitor.decorators import require_admin
+        from django.test import RequestFactory
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        factory = RequestFactory()
+        req = factory.post('/fake/')
+        req.user = self.admin
+        req.session = self.client.session
+        req._messages = FallbackStorage(req)
+
+        @require_admin
+        def my_view(request):
+            from django.http import HttpResponse
+            return HttpResponse('ok')
+
+        response = my_view(req)
+        self.assertEqual(response.status_code, 200)
+
+    def test_require_admin_rejects_viewer(self):
+        from monitor.decorators import require_admin
+        from django.test import RequestFactory
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        factory = RequestFactory()
+        req = factory.post('/fake/')
+        req.user = self.viewer
+        req.session = self.client.session
+        req._messages = FallbackStorage(req)
+
+        @require_admin
+        def my_view(request):
+            from django.http import HttpResponse
+            return HttpResponse('ok')
+
+        response = my_view(req)
+        self.assertEqual(response.status_code, 403)
