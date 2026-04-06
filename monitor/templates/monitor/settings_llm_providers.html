@@ -132,7 +132,7 @@
                     text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem">
         API Key
       </label>
-      <input type="password" name="api_key" placeholder="sk-ant-api03-… or sk-…" required
+      <input type="password" name="api_key" placeholder="Anthropic: sk-ant-admin-… · OpenAI: sk-…" required
              style="width:100%;background:#0f172a;border:1px solid #334155;
                     color:#e2e8f0;padding:.45rem .75rem;border-radius:5px;font-size:.85rem">
     </div>
@@ -144,7 +144,9 @@
     </button>
   </form>
   <p style="padding:0 1.25rem 1rem;font-size:.75rem;color:#64748b">
-    API keys are encrypted before storage and never displayed in plaintext.
+    Keys are encrypted before storage and never displayed in plaintext.
+    Anthropic requires an <strong>Admin API key</strong> (sk-ant-admin-…) from
+    Console → Settings → Admin Keys — not a standard API key.
   </p>
 </div>
 {% endif %}

@@ -89,28 +89,50 @@ class AnthropicAdapterTest(TestCase):
         import datetime
         from monitor.services.llm_sync_engine import AnthropicAdapter
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
+        # New Admin API format: usage_report/messages (first call)
+        usage_response = MagicMock()
+        usage_response.status_code = 200
+        usage_response.json.return_value = {
             "data": [
                 {
-                    "model": "claude-3-5-sonnet-20241022",
-                    "usage_period": {"start_time": "2026-04-01T00:00:00Z"},
-                    "input_tokens": 100000,
-                    "output_tokens": 5000,
-                    "cache_creation_input_tokens": 2000,
-                    "cache_read_input_tokens": 80000,
-                    "request_count": 42,
-                    "cost": 1.23456,
+                    "starting_at": "2026-04-01T00:00:00Z",
+                    "ending_at": "2026-04-02T00:00:00Z",
+                    "results": [
+                        {
+                            "model": "claude-3-5-sonnet-20241022",
+                            "uncached_input_tokens": 100000,
+                            "cache_read_input_tokens": 80000,
+                            "cache_creation": {
+                                "ephemeral_1h_input_tokens": 2000,
+                                "ephemeral_5m_input_tokens": 0,
+                            },
+                            "output_tokens": 5000,
+                        }
+                    ],
                 }
             ],
             "has_more": False,
         }
 
-        with patch("monitor.services.llm_sync_engine.requests.get", return_value=mock_response):
+        # cost_report (second call) — cost in USD cents as decimal string
+        cost_response = MagicMock()
+        cost_response.status_code = 200
+        cost_response.json.return_value = {
+            "data": [
+                {
+                    "starting_at": "2026-04-01T00:00:00Z",
+                    "ending_at": "2026-04-02T00:00:00Z",
+                    "results": [{"cost": "123.456"}],  # cents → $1.23456
+                }
+            ],
+            "has_more": False,
+        }
+
+        with patch("monitor.services.llm_sync_engine.requests.get",
+                   side_effect=[usage_response, cost_response]):
             adapter = AnthropicAdapter()
             records = adapter.fetch(
-                "sk-ant-fake",
+                "sk-ant-admin-fake",
                 datetime.date(2026, 4, 1),
                 datetime.date(2026, 4, 2),
             )
@@ -118,13 +140,13 @@ class AnthropicAdapterTest(TestCase):
         self.assertEqual(len(records), 1)
         r = records[0]
         self.assertEqual(r["model"], "claude-3-5-sonnet-20241022")
+        self.assertEqual(r["provider"], "anthropic")
         self.assertEqual(r["date"], datetime.date(2026, 4, 1))
-        self.assertEqual(r["input_tokens"], 100000)
+        self.assertEqual(r["input_tokens"], 100000)   # uncached_input_tokens
         self.assertEqual(r["output_tokens"], 5000)
         self.assertEqual(r["cache_creation_tokens"], 2000)
         self.assertEqual(r["cache_read_tokens"], 80000)
-        self.assertEqual(r["request_count"], 42)
-        self.assertEqual(r["provider"], "anthropic")
+        self.assertEqual(r["request_count"], 0)       # not available from Admin API
         self.assertAlmostEqual(float(r["cost_usd"]), 1.23456, places=4)
 
     def test_fetch_raises_on_auth_error(self):
@@ -198,21 +220,38 @@ class SyncProviderTest(TestCase):
             api_key_encrypted=encrypt_api_key("sk-ant-fake-key"),
         )
 
-    def _mock_anthropic_response(self, day_str="2026-04-01"):
+    def _mock_usage_response(self, day_str="2026-04-01"):
+        """Mock for Anthropic Admin API usage_report/messages endpoint."""
         from unittest.mock import MagicMock
         resp = MagicMock()
         resp.status_code = 200
         resp.json.return_value = {
             "data": [{
-                "model": "claude-3-5-sonnet-20241022",
-                "usage_period": {"start_time": f"{day_str}T00:00:00Z"},
-                "input_tokens": 1000,
-                "output_tokens": 200,
-                "cache_creation_input_tokens": 100,
-                "cache_read_input_tokens": 500,
-                "request_count": 5,
-                "cost": 0.05,
+                "starting_at": f"{day_str}T00:00:00Z",
+                "ending_at": f"{day_str}T00:00:00Z",
+                "results": [{
+                    "model": "claude-3-5-sonnet-20241022",
+                    "uncached_input_tokens": 1000,
+                    "cache_read_input_tokens": 500,
+                    "cache_creation": {
+                        "ephemeral_1h_input_tokens": 100,
+                        "ephemeral_5m_input_tokens": 0,
+                    },
+                    "output_tokens": 200,
+                }],
             }],
+            "has_more": False,
+        }
+        return resp
+
+    def _mock_cost_response(self):
+        """Mock for Anthropic Admin API cost_report endpoint."""
+        from unittest.mock import MagicMock
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "data": [{"starting_at": "2026-04-01T00:00:00Z", "ending_at": "2026-04-02T00:00:00Z",
+                      "results": [{"cost": "5.0"}]}],  # 5 cents = $0.05
             "has_more": False,
         }
         return resp
@@ -221,7 +260,7 @@ class SyncProviderTest(TestCase):
         from unittest.mock import patch
         from monitor.services.llm_sync_engine import sync_provider
         with patch("monitor.services.llm_sync_engine.requests.get",
-                   return_value=self._mock_anthropic_response()):
+                   side_effect=[self._mock_usage_response(), self._mock_cost_response()]):
             count = sync_provider(str(self.provider.id))
         self.assertEqual(count, 1)
         self.assertEqual(LLMUsageRecord.objects.filter(organization=self.org).count(), 1)
@@ -233,10 +272,10 @@ class SyncProviderTest(TestCase):
         from unittest.mock import patch
         from monitor.services.llm_sync_engine import sync_provider
         with patch("monitor.services.llm_sync_engine.requests.get",
-                   return_value=self._mock_anthropic_response()):
+                   side_effect=[self._mock_usage_response(), self._mock_cost_response()]):
             c1 = sync_provider(str(self.provider.id))
         with patch("monitor.services.llm_sync_engine.requests.get",
-                   return_value=self._mock_anthropic_response()):
+                   side_effect=[self._mock_usage_response(), self._mock_cost_response()]):
             c2 = sync_provider(str(self.provider.id))
         self.assertGreaterEqual(c1, 1)
         self.assertGreaterEqual(c2, 1)
@@ -248,7 +287,7 @@ class SyncProviderTest(TestCase):
         from monitor.services.llm_sync_engine import sync_provider
         self.assertIsNone(self.provider.last_synced_at)
         with patch("monitor.services.llm_sync_engine.requests.get",
-                   return_value=self._mock_anthropic_response()):
+                   side_effect=[self._mock_usage_response(), self._mock_cost_response()]):
             sync_provider(str(self.provider.id))
         self.provider.refresh_from_db()
         self.assertIsNotNone(self.provider.last_synced_at)

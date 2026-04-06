@@ -42,55 +42,107 @@ def decrypt_api_key(encrypted: str) -> str:
 
 class AnthropicAdapter:
     """
-    Fetches daily usage from https://api.anthropic.com/v1/usage.
+    Fetches daily usage from the Anthropic Admin API.
+
+    Requires an Admin API key (sk-ant-admin...) — NOT a standard API key.
+    Admin keys are created in: Console → Settings → Admin Keys
+    Docs: https://docs.anthropic.com/en/api/usage-cost-api
+
+    Makes two calls:
+      /v1/organizations/usage_report/messages — token counts per model per day
+      /v1/organizations/cost_report           — total USD cost (distributed proportionally)
+
     Returns a list of dicts with keys:
       date, provider, model, input_tokens, output_tokens,
       cache_creation_tokens, cache_read_tokens, request_count, cost_usd
+
+    Note: request_count is always 0 — not available from this API.
     """
-    BASE_URL = "https://api.anthropic.com/v1/usage"
+    USAGE_URL = "https://api.anthropic.com/v1/organizations/usage_report/messages"
+    COST_URL = "https://api.anthropic.com/v1/organizations/cost_report"
 
     def fetch(self, api_key: str, since_date: datetime.date, until_date: datetime.date) -> list:
         headers = {
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
         }
-        params = {
-            "start_date": since_date.isoformat(),
-            "end_date": until_date.isoformat(),
-            "limit": 100,
-        }
-        records = []
+        # RFC 3339 datetimes required
+        starting_at = f"{since_date.isoformat()}T00:00:00Z"
+        ending_at = f"{(until_date + datetime.timedelta(days=1)).isoformat()}T00:00:00Z"
+
+        # ── Fetch token usage (per model per day) ─────────────────────────────
+        params: list = [
+            ("starting_at", starting_at),
+            ("ending_at", ending_at),
+            ("bucket_width", "1d"),
+            ("group_by[]", "model"),
+            ("limit", 31),
+        ]
+        raw_buckets = []
         while True:
-            resp = requests.get(self.BASE_URL, headers=headers, params=params, timeout=30)
+            resp = requests.get(self.USAGE_URL, headers=headers, params=params, timeout=30)
             if resp.status_code != 200:
                 raise RuntimeError(
                     f"Anthropic usage API returned {resp.status_code}: {resp.text[:200]}"
                 )
             body = resp.json()
-            for item in body.get("data", []):
-                start_str = item.get("usage_period", {}).get("start_time", "")
-                try:
-                    day = datetime.date.fromisoformat(start_str[:10])
-                except (ValueError, TypeError):
-                    continue
-                records.append({
-                    "date": day,
-                    "provider": "anthropic",
-                    "model": item.get("model", "unknown"),
-                    "input_tokens": int(item.get("input_tokens", 0)),
-                    "output_tokens": int(item.get("output_tokens", 0)),
-                    "cache_creation_tokens": int(item.get("cache_creation_input_tokens", 0)),
-                    "cache_read_tokens": int(item.get("cache_read_input_tokens", 0)),
-                    "request_count": int(item.get("request_count", 0)),
-                    "cost_usd": float(item.get("cost", 0.0)),
-                })
+            raw_buckets.extend(body.get("data", []))
             if not body.get("has_more", False):
                 break
             next_page = body.get("next_page")
             if not next_page:
                 break
-            params["page"] = next_page
-        return records
+            params = [(k, v) for k, v in params if k != "page"] + [("page", next_page)]
+
+        # ── Fetch total cost for the date range ───────────────────────────────
+        total_cost_usd = 0.0
+        try:
+            cost_resp = requests.get(
+                self.COST_URL,
+                headers=headers,
+                params=[("starting_at", starting_at), ("ending_at", ending_at)],
+                timeout=30,
+            )
+            if cost_resp.status_code == 200:
+                for bucket in cost_resp.json().get("data", []):
+                    for item in bucket.get("results", []):
+                        # cost is in USD cents as a decimal string
+                        total_cost_usd += float(item.get("cost", "0")) / 100.0
+        except Exception as exc:
+            logger.warning("Anthropic cost fetch failed: %s", exc)
+
+        # ── Build records from usage buckets ──────────────────────────────────
+        day_records = []
+        for bucket in raw_buckets:
+            try:
+                day = datetime.date.fromisoformat(bucket["starting_at"][:10])
+            except (ValueError, KeyError):
+                continue
+            for result in bucket.get("results", []):
+                cache_obj = result.get("cache_creation") or {}
+                cache_creation_tokens = (
+                    int(cache_obj.get("ephemeral_1h_input_tokens", 0)) +
+                    int(cache_obj.get("ephemeral_5m_input_tokens", 0))
+                )
+                cache_read = int(result.get("cache_read_input_tokens", 0))
+                day_records.append({
+                    "date": day,
+                    "provider": "anthropic",
+                    "model": result.get("model") or "unknown",
+                    "input_tokens": int(result.get("uncached_input_tokens", 0)),
+                    "output_tokens": int(result.get("output_tokens", 0)),
+                    "cache_creation_tokens": cache_creation_tokens,
+                    "cache_read_tokens": cache_read,
+                    "request_count": 0,  # not available from Admin API
+                    "cost_usd": 0.0,     # allocated below
+                })
+
+        # Distribute total cost proportionally by output tokens
+        total_out = sum(r["output_tokens"] for r in day_records) or 1
+        for r in day_records:
+            r["cost_usd"] = round(total_cost_usd * (r["output_tokens"] / total_out), 6)
+
+        return day_records
 
 
 class OpenAIAdapter:
