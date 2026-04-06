@@ -47,8 +47,13 @@ class InviteModelTest(TestCase):
 
 
 class AuthRedirectTest(TestCase):
-    def test_dashboard_redirects_to_login_when_unauthenticated(self):
+    def test_landing_page_renders_when_unauthenticated(self):
+        # Root now shows a public landing page instead of redirecting to login
         response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_dashboard_redirects_to_login_when_unauthenticated(self):
+        response = self.client.get('/dashboard/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('/accounts/login/', response['Location'])
 
