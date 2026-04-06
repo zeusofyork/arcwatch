@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArcWatch — AI/ML GPU Fleet Monitoring</title>
+<meta name="description" content="ArcWatch gives AI/ML teams real-time visibility into GPU fleet utilisation, inference workloads, cost attribution, and alert thresholds — all in one place.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230f172a'/%3E%3Crect x='4' y='10' width='24' height='12' rx='3' fill='none' stroke='%2376B900' stroke-width='2'/%3E%3Crect x='8' y='13' width='4' height='6' rx='1' fill='%2376B900'/%3E%3Crect x='14' y='13' width='4' height='6' rx='1' fill='%2376B900'/%3E%3Crect x='20' y='13' width='4' height='6' rx='1' fill='%2376B900'/%3E%3Crect x='10' y='7' width='2' height='3' rx='1' fill='%2376B900'/%3E%3Crect x='16' y='7' width='2' height='3' rx='1' fill='%2376B900'/%3E%3Crect x='22' y='7' width='2' height='3' rx='1' fill='%2376B900'/%3E%3Crect x='10' y='22' width='2' height='3' rx='1' fill='%2376B900'/%3E%3Crect x='16' y='22' width='2' height='3' rx='1' fill='%2376B900'/%3E%3Crect x='22' y='22' width='2' height='3' rx='1' fill='%2376B900'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#263447;--border:rgba(255,255,255,0.08);
+  --text:#cbd5e1;--text-dim:#64748b;--text-bright:#f1f5f9;
+  --accent:#76B900;--accent2:#00D4AA;
+  --mono:'Share Tech Mono',monospace;--head:'Barlow Condensed',sans-serif;
+  --grid:rgba(118,185,0,.025);
+}
+
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  min-height:100vh;
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* ── Nav ── */
+nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(15,23,42,0.97);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  padding:0 2rem;
+  display:flex;align-items:center;justify-content:space-between;height:56px;
+}
+.logo{display:flex;align-items:center;gap:.5rem;text-decoration:none}
+.logo-icon{
+  width:30px;height:30px;
+  background:#0f172a;border:1.5px solid var(--accent);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+}
+.logo-icon svg{width:18px;height:18px}
+.logo-text{
+  font-family:var(--head);font-size:1.25rem;font-weight:700;letter-spacing:.04em;
+  color:var(--text-bright);
+}
+.logo-text em{color:var(--accent);font-style:normal}
+.nav-cta{
+  display:flex;gap:.75rem;align-items:center;
+}
+.btn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  font-family:var(--head);font-weight:600;font-size:.85rem;letter-spacing:.06em;
+  text-transform:uppercase;text-decoration:none;
+  padding:.45rem 1.1rem;border-radius:5px;border:none;cursor:pointer;
+  transition:all .15s;
+}
+.btn-ghost{color:var(--text);background:transparent;border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{color:#0f172a;background:var(--accent)}
+.btn-primary:hover{background:#8fd400;transform:translateY(-1px);box-shadow:0 4px 16px rgba(118,185,0,.3)}
+
+/* ── Hero ── */
+.hero{
+  max-width:1100px;margin:0 auto;padding:6rem 2rem 4rem;
+  display:grid;grid-template-columns:1fr 480px;gap:4rem;align-items:center;
+}
+@media(max-width:900px){.hero{grid-template-columns:1fr;gap:3rem}}
+.hero-eyebrow{
+  font-family:var(--mono);font-size:.72rem;color:var(--accent);letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:1rem;
+  display:flex;align-items:center;gap:.5rem;
+}
+.hero-eyebrow::before{content:'>';color:var(--accent2)}
+h1{
+  font-family:var(--head);font-size:3.5rem;font-weight:900;
+  line-height:1.05;letter-spacing:.02em;color:var(--text-bright);
+  text-transform:uppercase;margin-bottom:1.25rem;
+}
+h1 em{color:var(--accent);font-style:normal}
+.hero-sub{
+  font-size:1.05rem;color:var(--text);line-height:1.65;
+  max-width:480px;margin-bottom:2rem;
+}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap}
+
+/* ── Dashboard mockup ── */
+.mockup{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.mockup-bar{
+  background:var(--surface2);padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem;
+  border-bottom:1px solid var(--border);
+}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot-r{background:#ef4444}.dot-y{background:#f59e0b}.dot-g{background:#22c55e}
+.mockup-url{
+  font-family:var(--mono);font-size:.68rem;color:var(--text-dim);
+  background:rgba(255,255,255,.04);border-radius:4px;padding:.2rem .7rem;margin-left:.5rem;
+}
+.mockup-body{padding:1rem}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.75rem}
+.stat-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:.6rem .75rem;
+}
+.stat-label{font-family:var(--mono);font-size:.58rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em}
+.stat-val{font-family:var(--head);font-size:1.35rem;font-weight:700;color:var(--text-bright)}
+.stat-val.green{color:var(--accent)}
+.stat-val.cyan{color:var(--accent2)}
+.gpu-row{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:.5rem .75rem;margin-bottom:.4rem;
+  display:flex;align-items:center;gap:.75rem;font-size:.7rem;
+}
+.gpu-label{font-family:var(--mono);color:var(--text-dim);width:80px;flex-shrink:0}
+.gpu-name{color:var(--text-bright);font-family:var(--head);font-weight:600;flex:1}
+.bar-wrap{flex:1;background:rgba(255,255,255,.06);border-radius:2px;height:5px}
+.bar-fill{height:100%;border-radius:2px;background:var(--accent)}
+.bar-fill.hi{background:#ef4444}
+.bar-fill.mid{background:#f59e0b}
+.pct{font-family:var(--mono);font-size:.65rem;color:var(--text-dim);width:32px;text-align:right}
+
+/* ── Features ── */
+.features{
+  max-width:1100px;margin:0 auto;padding:5rem 2rem;
+}
+.section-header{text-align:center;margin-bottom:3rem}
+.section-tag{
+  font-family:var(--mono);font-size:.7rem;color:var(--accent);letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:.5rem;display:block;
+}
+h2{
+  font-family:var(--head);font-size:2.4rem;font-weight:800;
+  color:var(--text-bright);text-transform:uppercase;letter-spacing:.03em;
+}
+.feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem}
+@media(max-width:700px){.feature-grid{grid-template-columns:1fr}}
+.feature-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:1.75rem;
+  transition:border-color .2s,transform .2s;
+}
+.feature-card:hover{border-color:rgba(118,185,0,.35);transform:translateY(-2px)}
+.feature-icon{
+  width:44px;height:44px;border-radius:8px;
+  background:rgba(118,185,0,.1);border:1px solid rgba(118,185,0,.2);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:1rem;font-size:1.1rem;color:var(--accent);
+}
+.feature-title{
+  font-family:var(--head);font-size:1.15rem;font-weight:700;
+  color:var(--text-bright);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;
+}
+.feature-body{font-size:.875rem;line-height:1.65;color:var(--text)}
+
+/* ── Stats band ── */
+.stats-band{
+  background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  padding:3.5rem 2rem;
+}
+.stats-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:2rem}
+@media(max-width:700px){.stats-inner{grid-template-columns:repeat(2,1fr)}}
+.stat-item{text-align:center}
+.stat-number{
+  font-family:var(--head);font-size:3rem;font-weight:900;
+  color:var(--accent);letter-spacing:.02em;display:block;
+}
+.stat-desc{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;margin-top:.25rem}
+
+/* ── How it works ── */
+.how{max-width:1100px;margin:0 auto;padding:5rem 2rem}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:2.5rem}
+@media(max-width:700px){.steps{grid-template-columns:1fr}}
+.step{text-align:center;padding:1.5rem}
+.step-num{
+  font-family:var(--mono);font-size:2.5rem;font-weight:700;
+  color:rgba(118,185,0,.25);line-height:1;margin-bottom:.75rem;display:block;
+}
+.step-title{
+  font-family:var(--head);font-size:1.1rem;font-weight:700;
+  color:var(--text-bright);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;
+}
+.step-body{font-size:.85rem;line-height:1.6;color:var(--text)}
+
+/* ── CTA ── */
+.cta-section{
+  text-align:center;padding:5rem 2rem 6rem;
+  background:radial-gradient(ellipse 60% 40% at 50% 100%,rgba(118,185,0,.07),transparent);
+}
+.cta-section h2{font-size:2.8rem;margin-bottom:1rem}
+.cta-section p{font-size:1rem;color:var(--text);margin-bottom:2rem;max-width:480px;margin-left:auto;margin-right:auto}
+.cta-actions{display:flex;justify-content:center;gap:1rem;flex-wrap:wrap}
+
+/* ── Footer ── */
+footer{
+  border-top:1px solid var(--border);padding:1.5rem 2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:.78rem;color:var(--text-dim);
+}
+footer a{color:var(--text-dim);text-decoration:none}
+footer a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <a class="logo" href="/">
+    <span class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="5" width="16" height="8" rx="2" stroke="#76B900" stroke-width="1.5"/>
+        <rect x="3" y="7" width="3" height="4" rx=".5" fill="#76B900"/>
+        <rect x="7.5" y="7" width="3" height="4" rx=".5" fill="#76B900"/>
+        <rect x="12" y="7" width="3" height="4" rx=".5" fill="#76B900"/>
+        <rect x="4" y="2.5" width="1.5" height="2.5" rx=".5" fill="#76B900"/>
+        <rect x="8.25" y="2.5" width="1.5" height="2.5" rx=".5" fill="#76B900"/>
+        <rect x="12.5" y="2.5" width="1.5" height="2.5" rx=".5" fill="#76B900"/>
+        <rect x="4" y="13" width="1.5" height="2.5" rx=".5" fill="#76B900"/>
+        <rect x="8.25" y="13" width="1.5" height="2.5" rx=".5" fill="#76B900"/>
+        <rect x="12.5" y="13" width="1.5" height="2.5" rx=".5" fill="#76B900"/>
+      </svg>
+    </span>
+    <span class="logo-text">Arc<em>Watch</em></span>
+  </a>
+  <div class="nav-cta">
+    <a href="/accounts/login/" class="btn btn-ghost">Sign In</a>
+    <a href="/accounts/login/" class="btn btn-primary">Get Started</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-content">
+    <p class="hero-eyebrow">AI/ML Infrastructure Observability</p>
+    <h1>Full<br>Visibility<br>Into Your <em>GPU Fleet</em></h1>
+    <p class="hero-sub">
+      ArcWatch gives AI/ML teams real-time insight into GPU utilisation,
+      inference workload health, cost attribution, and threshold-based alerting —
+      all in a single platform built for modern GPU infrastructure.
+    </p>
+    <div class="hero-actions">
+      <a href="/accounts/login/" class="btn btn-primary">
+        <i class="fa fa-arrow-right-to-bracket"></i> Sign In to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Dashboard mockup -->
+  <div class="mockup">
+    <div class="mockup-bar">
+      <span class="dot dot-r"></span>
+      <span class="dot dot-y"></span>
+      <span class="dot dot-g"></span>
+      <span class="mockup-url">arcwatch.arcusautomate.com/dashboard/</span>
+    </div>
+    <div class="mockup-body">
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-label">GPUs</div>
+          <div class="stat-val">32</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Util</div>
+          <div class="stat-val green">78.4%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">VRAM</div>
+          <div class="stat-val cyan">1.8 TB</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">$/hr</div>
+          <div class="stat-val">$38.40</div>
+        </div>
+      </div>
+      <div class="gpu-row">
+        <span class="gpu-label">node-01</span>
+        <span class="gpu-name">H100 SXM5</span>
+        <div class="bar-wrap"><div class="bar-fill hi" style="width:94%"></div></div>
+        <span class="pct">94%</span>
+      </div>
+      <div class="gpu-row">
+        <span class="gpu-label">node-01</span>
+        <span class="gpu-name">H100 SXM5</span>
+        <div class="bar-wrap"><div class="bar-fill mid" style="width:61%"></div></div>
+        <span class="pct">61%</span>
+      </div>
+      <div class="gpu-row">
+        <span class="gpu-label">node-02</span>
+        <span class="gpu-name">A100 PCIe</span>
+        <div class="bar-wrap"><div class="bar-fill" style="width:43%"></div></div>
+        <span class="pct">43%</span>
+      </div>
+      <div class="gpu-row">
+        <span class="gpu-label">node-03</span>
+        <span class="gpu-name">A100 PCIe</span>
+        <div class="bar-wrap"><div class="bar-fill" style="width:12%"></div></div>
+        <span class="pct">12%</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats band -->
+<div class="stats-band">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <span class="stat-number">60s</span>
+      <div class="stat-desc">Metric refresh interval</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">5</span>
+      <div class="stat-desc">Alert rule types</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">vLLM</span>
+      <div class="stat-desc">Inference engine support</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">Go</span>
+      <div class="stat-desc">Lightweight collector agent</div>
+    </div>
+  </div>
+</div>
+
+<!-- Features -->
+<section class="features">
+  <div class="section-header">
+    <span class="section-tag">What ArcWatch Does</span>
+    <h2>Every Layer of Your<br>GPU Infrastructure, Covered</h2>
+  </div>
+  <div class="feature-grid">
+
+    <div class="feature-card">
+      <div class="feature-icon"><i class="fa fa-microchip"></i></div>
+      <div class="feature-title">GPU Fleet Dashboard</div>
+      <div class="feature-body">
+        Monitor every GPU across all your nodes and clusters in real time.
+        Track utilisation, VRAM pressure, temperature, and power draw.
+        Instant visual grading lets you spot underutilised or overloaded
+        hardware at a glance.
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon"><i class="fa fa-bolt"></i></div>
+      <div class="feature-title">Inference Monitoring</div>
+      <div class="feature-body">
+        Connect vLLM endpoints via the ArcWatch Go collector agent.
+        Track requests running, queue depth, token throughput, and KV-cache
+        pressure per endpoint and model — so you know exactly how your
+        inference fleet is performing.
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon"><i class="fa fa-dollar-sign"></i></div>
+      <div class="feature-title">Cost Attribution</div>
+      <div class="feature-body">
+        Attach hourly pricing to nodes and get per-team cost breakdowns
+        automatically. Track cumulative spend by day, week, or month.
+        Identify which clusters or workloads are burning budget and
+        surface cost anomalies before they become surprises.
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon"><i class="fa fa-bell"></i></div>
+      <div class="feature-title">Smart Alerting</div>
+      <div class="feature-body">
+        Define rules on GPU utilisation, memory pressure, inference latency,
+        offline GPU count, or spend rate. ArcWatch evaluates rules every 60
+        seconds and fires de-duplicated events with Slack notifications —
+        so you're paged only when it matters.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="how">
+  <div class="section-header">
+    <span class="section-tag">Getting Started</span>
+    <h2>Up and Running in Minutes</h2>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <span class="step-num">01</span>
+      <div class="step-title">Deploy the Agent</div>
+      <div class="step-body">
+        Run the ArcWatch Go collector on each GPU node. It scrapes NVML
+        stats and vLLM Prometheus metrics, then ships them to the
+        platform over HTTPS using your API key.
+      </div>
+    </div>
+    <div class="step">
+      <span class="step-num">02</span>
+      <div class="step-title">See Your Fleet</div>
+      <div class="step-body">
+        Metrics appear on your dashboard within one scrape cycle.
+        Add node pricing in Settings to unlock cost attribution
+        and hourly fleet spend tracking.
+      </div>
+    </div>
+    <div class="step">
+      <span class="step-num">03</span>
+      <div class="step-title">Set Alert Rules</div>
+      <div class="step-body">
+        Configure threshold rules and attach a Slack webhook.
+        ArcWatch evaluates rules every minute and notifies your
+        team the moment a GPU goes offline or inference latency spikes.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2>Ready to See<br>Your <em>Fleet in Action?</em></h2>
+  <p>Sign in to your ArcWatch dashboard and start monitoring your GPU infrastructure today.</p>
+  <div class="cta-actions">
+    <a href="/accounts/login/" class="btn btn-primary">
+      <i class="fa fa-arrow-right-to-bracket"></i> Sign In
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <span>ArcWatch &mdash; AI/ML GPU Fleet Monitoring</span>
+  <div style="display:flex;gap:1.5rem">
+    <a href="/accounts/login/">Sign In</a>
+    <a href="https://github.com/arcwatch/agent">Agent Docs</a>
+  </div>
+</footer>
+
+</body>
+</html>

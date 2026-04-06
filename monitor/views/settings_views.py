@@ -407,7 +407,7 @@ def accept_invite(request, token):
             invite.accepted_at = tz.now()
             invite.save(update_fields=['accepted_at'])
             login(request, user)
-            return redirect('/')
+            return redirect('/dashboard/')
     else:
         form = AcceptInviteForm()
 

@@ -5,7 +5,7 @@ GPU Fleet Dashboard view — renders the real-time GPU fleet overview page.
 """
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count, Sum
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from monitor.models import GPU, GPUNode
 
@@ -121,3 +121,10 @@ def gpu_fleet_dashboard(request):
         "util_low_count": util_low_count,
     }
     return render(request, "monitor/gpu_fleet_dashboard.html", context)
+
+
+def landing(request):
+    """Public landing page. Authenticated users are sent straight to the dashboard."""
+    if request.user.is_authenticated:
+        return redirect('monitor:gpu_fleet_dashboard')
+    return render(request, "monitor/landing.html")
