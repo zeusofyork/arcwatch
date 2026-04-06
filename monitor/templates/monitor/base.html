@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<meta name="csrf-token" content="{{ csrf_token }}">
 <style>
 /* ── Design System: Spacing & Typography Scales ── */
 :root{
@@ -419,6 +421,11 @@ footer{
         <div class="nav-pill">
           <span class="pulse-dot"></span>LIVE
         </div>
+        {% if request.user.is_authenticated %}
+        <a href="/settings/" style="color:#94a3b8;text-decoration:none;font-size:.8rem;margin-left:16px">&#9881; Settings</a>
+        <span style="color:#475569;margin-left:16px;font-size:.8rem">{{ request.user.username }}</span>
+        <a href="/accounts/logout/" style="color:#64748b;text-decoration:none;font-size:.75rem;margin-left:8px">Logout</a>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -442,5 +449,17 @@ footer{
 </footer>
 
 {% block extra_js %}{% endblock %}
+<script>
+  document.body.addEventListener('htmx:configRequest', function(e) {
+    e.detail.headers['X-CSRFToken'] = document.querySelector('meta[name=csrf-token]').content;
+  });
+  document.body.addEventListener('htmx:responseError', function(e) {
+    var toast = document.createElement('div');
+    toast.textContent = 'Action failed. Please try again.';
+    toast.style = 'position:fixed;bottom:20px;right:20px;background:#f87171;color:#000;padding:10px 16px;border-radius:6px;font-size:.8rem;z-index:9999';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3000);
+  });
+</script>
 </body>
 </html>

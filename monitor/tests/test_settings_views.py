@@ -104,3 +104,29 @@ class DecoratorTest(TestCase):
 
         response = my_view(req)
         self.assertEqual(response.status_code, 403)
+
+
+class SettingsNavTest(TestCase):
+    def setUp(self):
+        self.user, self.org = _make_user_and_org('nav_user', role='admin')
+        self.client.login(username='nav_user', password='pw')
+
+    def test_settings_redirect_to_api_keys(self):
+        response = self.client.get('/settings/')
+        self.assertRedirects(response, '/settings/api-keys/', fetch_redirect_response=False)
+
+    def test_api_keys_page_returns_200(self):
+        response = self.client.get('/settings/api-keys/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_alert_rules_page_returns_200(self):
+        response = self.client.get('/settings/alert-rules/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_resources_page_returns_200(self):
+        response = self.client.get('/settings/resources/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_members_page_returns_200(self):
+        response = self.client.get('/settings/members/')
+        self.assertEqual(response.status_code, 200)
