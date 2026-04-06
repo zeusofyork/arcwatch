@@ -3,12 +3,14 @@ monitor/views/alert_views.py
 
 Alerts Dashboard view — lists AlertRules and recent AlertEvents.
 """
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 
 from monitor.models import AlertEvent, AlertRule, Organization
 
 
+@login_required
 def alerts_dashboard(request):
     """
     Render the alerts dashboard.

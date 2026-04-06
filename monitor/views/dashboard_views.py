@@ -3,12 +3,14 @@ monitor/views/dashboard_views.py
 
 GPU Fleet Dashboard view — renders the real-time GPU fleet overview page.
 """
+from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count, Sum
 from django.shortcuts import render
 
 from monitor.models import GPU, GPUNode
 
 
+@login_required
 def gpu_fleet_dashboard(request):
     """
     Render the GPU fleet dashboard.

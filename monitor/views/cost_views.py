@@ -3,12 +3,14 @@ monitor/views/cost_views.py
 
 Cost Attribution Dashboard view.
 """
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 from monitor.models import GPU, GPUNode, GPUPricing, Organization
 from monitor.services.cost_engine import get_cost_summary, get_fleet_cost_rate
 
 
+@login_required
 def cost_dashboard(request):
     """
     Render the cost attribution dashboard.

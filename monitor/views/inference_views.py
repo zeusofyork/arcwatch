@@ -3,11 +3,13 @@ monitor/views/inference_views.py
 
 Inference Dashboard view — lists all InferenceEndpoints with live metrics.
 """
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 from monitor.models import InferenceEndpoint
 
 
+@login_required
 def inference_dashboard(request):
     """
     Render the inference endpoints dashboard.
