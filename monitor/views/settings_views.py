@@ -113,11 +113,12 @@ def create_alert_rule(request):
 @login_required
 @require_admin
 def toggle_alert_rule(request, rule_id):
+    if request.method != 'POST':
+        return HttpResponse(status=405)
     org = _get_org(request.user)
     rule = get_object_or_404(AlertRule, pk=rule_id, organization=org)
-    if request.method == 'POST':
-        rule.is_enabled = not rule.is_enabled
-        rule.save(update_fields=['is_enabled'])
+    rule.is_enabled = not rule.is_enabled
+    rule.save(update_fields=['is_enabled'])
     return render(request, 'monitor/fragments/alert_rule_toggle.html', {
         'rule': rule, 'is_admin': True,
     })
@@ -126,10 +127,11 @@ def toggle_alert_rule(request, rule_id):
 @login_required
 @require_admin
 def delete_alert_rule(request, rule_id):
+    if request.method != 'POST':
+        return HttpResponse(status=405)
     org = _get_org(request.user)
     rule = get_object_or_404(AlertRule, pk=rule_id, organization=org)
-    if request.method == 'POST':
-        rule.delete()
+    rule.delete()
     return HttpResponse('')
 
 

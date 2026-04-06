@@ -2,7 +2,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-from monitor.models import Organization, GPUCluster, GPUNode, Invite
+from monitor.models import Organization, GPUCluster, GPUNode, Invite, AlertRule
 
 
 def _make_user_and_org(username='admin', role='owner'):
@@ -182,7 +182,6 @@ class AlertRulesPageTest(TestCase):
         self.viewer.profile.organization = self.org
         self.viewer.profile.role = 'viewer'
         self.viewer.profile.save()
-        from monitor.models import AlertRule
         self.rule = AlertRule.objects.create(
             organization=self.org,
             name='Test Rule',
@@ -201,7 +200,6 @@ class AlertRulesPageTest(TestCase):
             'slack_webhook_url': '',
         })
         self.assertEqual(response.status_code, 302)
-        from monitor.models import AlertRule
         self.assertTrue(AlertRule.objects.filter(name='New Rule', organization=self.org).exists())
 
     def test_create_alert_rule_viewer_gets_403(self):
@@ -223,5 +221,4 @@ class AlertRulesPageTest(TestCase):
         self.client.login(username='ar_admin', password='pw')
         response = self.client.post(f'/settings/alert-rules/{self.rule.id}/delete/')
         self.assertEqual(response.status_code, 200)
-        from monitor.models import AlertRule
         self.assertFalse(AlertRule.objects.filter(pk=self.rule.id).exists())
