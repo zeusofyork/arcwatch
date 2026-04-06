@@ -283,7 +283,7 @@ class MembersPageTest(TestCase):
         self.member.profile.role = 'viewer'
         self.member.profile.save()
 
-    @patch('django.core.mail.send_mail')
+    @patch('monitor.views.settings_views.send_mail')
     def test_invite_creates_invite_row_and_sends_email(self, mock_send):
         self.client.login(username='mem_admin', password='pw')
         response = self.client.post('/settings/members/invite/', {
