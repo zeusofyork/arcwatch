@@ -6,6 +6,8 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from monitor.decorators import require_admin
+from monitor.forms import AlertRuleForm, InviteForm
+from monitor.models import Invite
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -51,7 +53,6 @@ def settings_api_keys(request):
 @login_required
 def settings_alert_rules(request):
     org = _get_org(request.user)
-    from monitor.forms import AlertRuleForm
     return render(request, 'monitor/settings_alert_rules.html', {
         'active_tab': 'alert-rules',
         'org': org,
@@ -84,8 +85,6 @@ def settings_resources(request):
 @login_required
 def settings_members(request):
     org = _get_org(request.user)
-    from monitor.models import Invite
-    from monitor.forms import InviteForm
     members = org.get_members().select_related('profile') if org else []
     pending = Invite.objects.filter(organization=org, accepted_at__isnull=True) if org else []
     return render(request, 'monitor/settings_members.html', {
