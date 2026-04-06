@@ -14,9 +14,11 @@ def require_admin(view_func):
     """
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return HttpResponseForbidden("Admin access required.")
         try:
             role = request.user.profile.role
-        except Exception:
+        except AttributeError:
             return HttpResponseForbidden("Admin access required.")
         if role not in ('admin', 'owner'):
             return HttpResponseForbidden("Admin access required.")
