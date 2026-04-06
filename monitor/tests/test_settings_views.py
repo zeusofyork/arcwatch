@@ -2,6 +2,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
+from unittest.mock import patch
 from monitor.models import Organization, GPUCluster, GPUNode, Invite, AlertRule
 
 
@@ -272,3 +273,56 @@ class ResourcesPageTest(TestCase):
         response = self.client.post(f'/settings/resources/clusters/{cluster.id}/delete/')
         self.assertEqual(response.status_code, 200)
         self.assertFalse(GPUCluster.objects_unscoped.filter(pk=cluster.id).exists())
+
+
+class MembersPageTest(TestCase):
+    def setUp(self):
+        self.admin, self.org = _make_user_and_org('mem_admin', role='owner')
+        self.member = User.objects.create_user(username='mem_alice', password='pw')
+        self.member.profile.organization = self.org
+        self.member.profile.role = 'viewer'
+        self.member.profile.save()
+
+    @patch('django.core.mail.send_mail')
+    def test_invite_creates_invite_row_and_sends_email(self, mock_send):
+        self.client.login(username='mem_admin', password='pw')
+        response = self.client.post('/settings/members/invite/', {
+            'email': 'new@example.com',
+            'role': 'viewer',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Invite.objects.filter(email='new@example.com', organization=self.org).exists())
+        self.assertTrue(mock_send.called)
+
+    def test_change_member_role(self):
+        self.client.login(username='mem_admin', password='pw')
+        response = self.client.post(f'/settings/members/{self.member.id}/role/', {'role': 'admin'})
+        self.assertEqual(response.status_code, 200)
+        self.member.profile.refresh_from_db()
+        self.assertEqual(self.member.profile.role, 'admin')
+
+    def test_remove_member(self):
+        self.client.login(username='mem_admin', password='pw')
+        response = self.client.post(f'/settings/members/{self.member.id}/remove/')
+        self.assertEqual(response.status_code, 200)
+        self.member.profile.refresh_from_db()
+        self.assertIsNone(self.member.profile.organization)
+
+    def test_accept_invite_creates_user(self):
+        invite = Invite.objects.create(
+            organization=self.org,
+            invited_by=self.admin,
+            email='newguy@example.com',
+            role='viewer',
+        )
+        response = self.client.post(f'/accounts/accept-invite/{invite.token}/', {
+            'username': 'newguy',
+            'password': 'securepass123',
+            'password_confirm': 'securepass123',
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        new_user = User.objects.get(username='newguy')
+        self.assertEqual(new_user.profile.organization, self.org)
+        self.assertEqual(new_user.profile.role, 'viewer')
+        invite.refresh_from_db()
+        self.assertIsNotNone(invite.accepted_at)

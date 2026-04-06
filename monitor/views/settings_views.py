@@ -268,16 +268,148 @@ def settings_members(request):
     members = org.get_members().select_related('profile') if org else []
     pending = Invite.objects.filter(organization=org, accepted_at__isnull=True) if org else []
     return render(request, 'monitor/settings_members.html', {
-        'active_tab': 'members',
-        'org': org,
-        'is_admin': _is_admin(request.user),
-        'members': members,
-        'pending_invites': pending,
-        'form': InviteForm(),
+        'active_tab': 'members', 'org': org, 'is_admin': _is_admin(request.user),
+        'members': members, 'pending_invites': pending, 'form': InviteForm(),
     })
+
+
+@login_required
+@require_admin
+def change_member_role(request, user_id):
+    from django.contrib.auth.models import User as DjangoUser
+    org = _get_org(request.user)
+    member = get_object_or_404(DjangoUser, pk=user_id, profile__organization=org)
+    if request.method == 'POST':
+        role = request.POST.get('role', '')
+        if role in ('viewer', 'operator', 'admin', 'owner'):
+            member.profile.role = role
+            member.profile.save(update_fields=['role'])
+    role_colors = {
+        'owner': '#76B900', 'admin': '#fbbf24',
+        'operator': '#a78bfa', 'viewer': '#60a5fa',
+    }
+    color = role_colors.get(member.profile.role, '#94a3b8')
+    return HttpResponse(
+        f'<span style="background:rgba(0,0,0,.1);border:1px solid {color}40;color:{color};'
+        f'font-size:.62rem;padding:2px 7px;border-radius:10px;cursor:pointer">'
+        f'{member.profile.role} &#9662;</span>'
+    )
+
+
+@login_required
+@require_admin
+def remove_member(request, user_id):
+    from django.contrib.auth.models import User as DjangoUser
+    org = _get_org(request.user)
+    member = get_object_or_404(DjangoUser, pk=user_id, profile__organization=org)
+    if request.method == 'POST' and member != request.user:
+        member.profile.organization = None
+        member.profile.save(update_fields=['organization'])
+    return HttpResponse('')
+
+
+@login_required
+@require_admin
+def invite_member(request):
+    if request.method != 'POST':
+        return redirect('/settings/members/')
+    org = _get_org(request.user)
+    if org is None:
+        return HttpResponseForbidden("No organization.")
+    from django.core.mail import send_mail
+    from django.conf import settings as django_settings
+    form = InviteForm(request.POST)
+    if form.is_valid():
+        invite = Invite.objects.create(
+            organization=org,
+            invited_by=request.user,
+            email=form.cleaned_data['email'],
+            role=form.cleaned_data['role'],
+        )
+        accept_url = request.build_absolute_uri(f'/accounts/accept-invite/{invite.token}/')
+        send_mail(
+            subject=f"You're invited to {org.name} on ArcWatch",
+            message=(
+                f"Hi,\n\n"
+                f"{request.user.username} has invited you to join {org.name} on ArcWatch "
+                f"as a {invite.role}.\n\n"
+                f"Accept your invite here (expires in 7 days):\n{accept_url}\n\n"
+                f"— The ArcWatch Team"
+            ),
+            from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@arcwatch.local'),
+            recipient_list=[invite.email],
+            fail_silently=True,
+        )
+    return redirect('/settings/members/')
+
+
+@login_required
+@require_admin
+def revoke_invite(request, token):
+    org = _get_org(request.user)
+    invite = get_object_or_404(Invite, token=token, organization=org, accepted_at__isnull=True)
+    if request.method == 'POST':
+        invite.delete()
+    return HttpResponse('')
+
+
+@login_required
+@require_admin
+def resend_invite(request, token):
+    from django.core.mail import send_mail
+    from django.conf import settings as django_settings
+    org = _get_org(request.user)
+    invite = get_object_or_404(Invite, token=token, organization=org, accepted_at__isnull=True)
+    if request.method == 'POST':
+        accept_url = request.build_absolute_uri(f'/accounts/accept-invite/{invite.token}/')
+        send_mail(
+            subject=f"You're invited to {org.name} on ArcWatch (reminder)",
+            message=f"Accept your invite here (expires in 7 days):\n{accept_url}",
+            from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@arcwatch.local'),
+            recipient_list=[invite.email],
+            fail_silently=True,
+        )
+    return HttpResponse('<span style="color:#60a5fa;font-size:.68rem">Sent &#10003;</span>')
 
 
 # ── Accept invite (no login required — used by new users) ────────────────────
 
 def accept_invite(request, token):
-    return render(request, 'monitor/accept_invite.html', {})
+    from django.contrib.auth import login
+    from django.contrib.auth.models import User as DjangoUser
+    from django.utils import timezone as tz
+    from monitor.forms import AcceptInviteForm
+
+    invite = get_object_or_404(Invite, token=token)
+
+    if invite.is_accepted:
+        return redirect('/accounts/login/')
+
+    if invite.is_expired:
+        return render(request, 'monitor/accept_invite.html', {
+            'error': "This invite has expired. Ask an admin to resend it.",
+            'invite': invite,
+        })
+
+    if request.method == 'POST':
+        form = AcceptInviteForm(request.POST)
+        if form.is_valid():
+            user = DjangoUser.objects.create_user(
+                username=form.cleaned_data['username'],
+                email=invite.email,
+                password=form.cleaned_data['password'],
+            )
+            user.profile.organization = invite.organization
+            user.profile.role = invite.role
+            user.profile.save()
+            invite.accepted_at = tz.now()
+            invite.save(update_fields=['accepted_at'])
+            login(request, user)
+            return redirect('/')
+    else:
+        form = AcceptInviteForm()
+
+    return render(request, 'monitor/accept_invite.html', {
+        'form': form,
+        'invite': invite,
+    })

@@ -12,6 +12,8 @@ from monitor.views.settings_views import (
     create_cluster, deactivate_cluster, delete_cluster,
     deactivate_node, delete_node,
     create_endpoint, deactivate_endpoint, delete_endpoint,
+    change_member_role, remove_member, invite_member,
+    revoke_invite, resend_invite,
 )
 
 app_name = 'monitor'
@@ -41,6 +43,11 @@ urlpatterns = [
     path('settings/resources/endpoints/<uuid:endpoint_id>/deactivate/', deactivate_endpoint, name='deactivate_endpoint'),
     path('settings/resources/endpoints/<uuid:endpoint_id>/delete/', delete_endpoint, name='delete_endpoint'),
     path('settings/members/', settings_members, name='settings_members'),
+    path('settings/members/<int:user_id>/role/', change_member_role, name='change_member_role'),
+    path('settings/members/<int:user_id>/remove/', remove_member, name='remove_member'),
+    path('settings/members/invite/', invite_member, name='invite_member'),
+    path('settings/members/invite/<uuid:token>/revoke/', revoke_invite, name='revoke_invite'),
+    path('settings/members/invite/<uuid:token>/resend/', resend_invite, name='resend_invite'),
 
     # ── REST API ──────────────────────────────────────────────────────────────
     path('api/v1/ingest/gpu/', ingest_gpu, name='api_ingest_gpu'),

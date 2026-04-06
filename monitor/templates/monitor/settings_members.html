@@ -1,5 +1,134 @@
 {% extends "monitor/settings_base.html" %}
 {% block settings_content %}
 <h2 style="font-family:monospace;color:#e2e8f0;font-size:.95rem;margin:0 0 4px 0">Members</h2>
-<p style="color:#64748b;font-size:.72rem">Manage who can access this organization</p>
+<p style="color:#64748b;font-size:.72rem;margin:0 0 20px 0">Manage who can access this organization</p>
+
+<!-- Active members -->
+<div style="font-size:.65rem;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;color:#475569;margin-bottom:8px">Active Members</div>
+<table style="width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:24px">
+  <thead>
+    <tr style="border-bottom:1px solid #1e293b">
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">User</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Email</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Role</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Joined</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for member in members %}
+    <tr id="member-{{ member.id }}" style="border-bottom:1px solid #1e293b">
+      <td style="padding:9px 10px;color:#e2e8f0">{{ member.username }}</td>
+      <td style="padding:9px 10px;color:#64748b;font-size:.72rem">{{ member.email }}</td>
+      <td style="padding:9px 10px">
+        {% if is_admin and member != request.user %}
+        <span id="role-{{ member.id }}">
+          <select hx-post="/settings/members/{{ member.id }}/role/"
+                  hx-target="#role-{{ member.id }}"
+                  hx-swap="innerHTML"
+                  name="role"
+                  style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:3px 6px;border-radius:4px;font-size:.7rem">
+            <option value="viewer" {% if member.profile.role == 'viewer' %}selected{% endif %}>viewer</option>
+            <option value="operator" {% if member.profile.role == 'operator' %}selected{% endif %}>operator</option>
+            <option value="admin" {% if member.profile.role == 'admin' %}selected{% endif %}>admin</option>
+            <option value="owner" {% if member.profile.role == 'owner' %}selected{% endif %}>owner</option>
+          </select>
+        </span>
+        {% else %}
+        <span style="font-size:.62rem;padding:2px 7px;border-radius:10px;
+              {% if member.profile.role == 'owner' %}background:rgba(118,185,0,.1);border:1px solid rgba(118,185,0,.25);color:#76B900
+              {% elif member.profile.role == 'admin' %}background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:#fbbf24
+              {% else %}background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);color:#60a5fa{% endif %}">
+          {{ member.profile.role }}
+        </span>
+        {% endif %}
+      </td>
+      <td style="padding:9px 10px;color:#64748b;font-size:.72rem">{{ member.date_joined|date:"M j, Y" }}</td>
+      <td style="padding:9px 10px;text-align:right">
+        {% if is_admin and member != request.user %}
+        <button hx-post="/settings/members/{{ member.id }}/remove/"
+                hx-target="#member-{{ member.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Remove {{ member.username }} from this organization?"
+                style="background:transparent;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0">Remove</button>
+        {% else %}
+        <span style="color:#475569;font-size:.72rem">—</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" style="padding:20px 10px;color:#475569;text-align:center;font-size:.78rem">No members</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<!-- Pending invites -->
+{% if pending_invites %}
+<div style="font-size:.65rem;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;color:#475569;margin-bottom:8px">Pending Invites</div>
+<table style="width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:24px">
+  <thead>
+    <tr style="border-bottom:1px solid #1e293b">
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Email</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Role</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Invited</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Expires</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for invite in pending_invites %}
+    <tr id="invite-{{ invite.token }}" style="border-bottom:1px solid #1e293b">
+      <td style="padding:9px 10px;color:#94a3b8;font-size:.75rem">{{ invite.email }}</td>
+      <td style="padding:9px 10px">
+        <span style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);color:#60a5fa;font-size:.62rem;padding:2px 7px;border-radius:10px">{{ invite.role }}</span>
+      </td>
+      <td style="padding:9px 10px;color:#64748b;font-size:.72rem">{{ invite.created_at|date:"M j" }}</td>
+      <td style="padding:9px 10px;color:#fbbf24;font-size:.72rem">{{ invite.expires_at|date:"M j" }}</td>
+      <td style="padding:9px 10px;text-align:right">
+        {% if is_admin %}
+        <span style="display:inline-flex;gap:10px;font-size:.72rem">
+          <button id="resend-{{ invite.token }}"
+                  hx-post="/settings/members/invite/{{ invite.token }}/resend/"
+                  hx-target="#resend-{{ invite.token }}"
+                  hx-swap="outerHTML"
+                  style="background:transparent;border:none;color:#60a5fa;cursor:pointer;padding:0">Resend</button>
+          <button hx-post="/settings/members/invite/{{ invite.token }}/revoke/"
+                  hx-target="#invite-{{ invite.token }}"
+                  hx-swap="outerHTML"
+                  hx-confirm="Revoke invite for {{ invite.email }}?"
+                  style="background:transparent;border:none;color:#f87171;cursor:pointer;padding:0">Revoke</button>
+        </span>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<!-- Invite form -->
+{% if is_admin %}
+<div style="background:#111827;border:1px solid #1e293b;border-radius:6px;padding:18px">
+  <div style="font-size:.8rem;font-weight:700;color:#e2e8f0;font-family:monospace;margin-bottom:14px">Invite Member</div>
+  <form method="post" action="/settings/members/invite/">
+    {% csrf_token %}
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Email address</label>
+        {{ form.email }}
+      </div>
+      <div style="width:130px">
+        <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Role</label>
+        {{ form.role }}
+      </div>
+      <button type="submit" style="background:#76B900;color:#000;font-weight:700;font-family:monospace;font-size:.78rem;padding:7px 16px;border:none;border-radius:4px;cursor:pointer">
+        Send Invite
+      </button>
+    </div>
+    <div style="margin-top:8px;font-size:.68rem;color:#475569">
+      Invite link expires in 7 days &middot; User sets their own password on first login
+    </div>
+  </form>
+</div>
+{% endif %}
 {% endblock %}
