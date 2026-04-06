@@ -8,6 +8,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-insecure-fallback-key-change-in-p
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Required for Django 4.0+ when behind HTTPS reverse proxy (ALB → nginx)
+_trusted = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _trusted.split(',') if o.strip()]
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
