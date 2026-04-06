@@ -6,7 +6,7 @@ import json
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
-from monitor.models import LLMUsageRecord
+from monitor.models import LLMUsageRecord, LLMProvider
 
 
 def _get_org(user):
@@ -134,4 +134,13 @@ def llm_dashboard(request):
         "chart_anthropic": json.dumps(chart_anthropic),
         "chart_openai": json.dumps(chart_openai),
         "month_name": today.strftime("%B %Y"),
+    })
+
+
+@login_required
+def llm_setup(request):
+    org = _get_org(request.user)
+    has_providers = org is not None and LLMProvider.objects.filter(organization=org).exists()
+    return render(request, "monitor/llm_setup.html", {
+        "has_providers": has_providers,
     })

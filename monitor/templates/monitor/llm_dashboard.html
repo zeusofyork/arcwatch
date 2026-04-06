@@ -18,12 +18,20 @@
         {{ month_name }}
       </h1>
     </div>
+    <div style="display:flex;gap:.5rem">
+    <a href="{% url 'monitor:llm_setup' %}"
+       style="font-family:monospace;font-size:.78rem;font-weight:600;color:#64748b;
+              text-transform:uppercase;letter-spacing:.06em;text-decoration:none;
+              border:1px solid #334155;padding:.35rem .9rem;border-radius:5px">
+      <i class="fa fa-question-circle" style="margin-right:.35rem"></i>Setup Guide
+    </a>
     <a href="/settings/llm-providers/"
        style="font-family:monospace;font-size:.78rem;font-weight:600;color:#64748b;
               text-transform:uppercase;letter-spacing:.06em;text-decoration:none;
               border:1px solid #334155;padding:.35rem .9rem;border-radius:5px">
       <i class="fa fa-key" style="margin-right:.35rem"></i>Manage Keys
     </a>
+    </div>
   </div>
 
   <!-- KPI cards -->

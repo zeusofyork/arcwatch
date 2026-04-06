@@ -1,0 +1,201 @@
+{% extends "monitor/base.html" %}
+{% block title %}LLM API Setup{% endblock %}
+{% block nav_llm %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;margin:0 auto;padding:40px 24px">
+
+  <!-- Header -->
+  <div style="margin-bottom:2.5rem">
+    <div style="font-family:monospace;font-size:.68rem;color:#76B900;text-transform:uppercase;
+                letter-spacing:.1em;margin-bottom:.4rem">
+      LLM API Usage
+    </div>
+    <h1 style="font-family:monospace;font-size:1.6rem;font-weight:800;color:#e2e8f0;
+               text-transform:uppercase;letter-spacing:.04em;margin:0 0 .5rem 0">
+      Setup Guide
+    </h1>
+    <p style="color:#64748b;font-size:.85rem;margin:0">
+      Connect your Anthropic and OpenAI accounts to track token usage, costs, and projected spend
+      across your organization.
+    </p>
+  </div>
+
+  {% if has_providers %}
+  <div style="background:rgba(118,185,0,.08);border:1px solid rgba(118,185,0,.25);
+              border-radius:6px;padding:.8rem 1.1rem;margin-bottom:2rem;
+              display:flex;align-items:center;gap:.75rem">
+    <span style="color:#76B900;font-size:1rem">&#10003;</span>
+    <span style="font-size:.85rem;color:#a3b8cc">
+      You have providers configured.
+      <a href="{% url 'monitor:llm_dashboard' %}" style="color:#76B900">View dashboard &rarr;</a>
+    </span>
+  </div>
+  {% endif %}
+
+  <!-- Step 1 -->
+  <div style="margin-bottom:2rem">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+      <span style="background:#76B900;color:#0f172a;font-family:monospace;font-weight:800;
+                   font-size:.7rem;width:22px;height:22px;border-radius:50%;display:flex;
+                   align-items:center;justify-content:center;flex-shrink:0">1</span>
+      <h2 style="font-family:monospace;font-size:1rem;font-weight:700;color:#e2e8f0;
+                 text-transform:uppercase;letter-spacing:.06em;margin:0">
+        Get your API keys
+      </h2>
+    </div>
+    <div style="border-left:2px solid #1e293b;margin-left:11px;padding-left:1.5rem">
+      <p style="color:#94a3b8;font-size:.85rem;margin:0 0 .75rem 0">
+        You need an API key from each provider you want to track. Keys require
+        <strong style="color:#e2e8f0">read access to usage data</strong> — no write permissions needed.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:.9rem 1rem">
+          <div style="font-family:monospace;font-size:.7rem;color:#76B900;text-transform:uppercase;
+                      letter-spacing:.06em;margin-bottom:.35rem">Anthropic</div>
+          <div style="font-size:.8rem;color:#94a3b8;margin-bottom:.4rem">
+            console.anthropic.com &rarr; API Keys
+          </div>
+          <div style="font-family:monospace;font-size:.72rem;color:#64748b">
+            Key format: <span style="color:#e2e8f0">sk-ant-api03-…</span>
+          </div>
+        </div>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:.9rem 1rem">
+          <div style="font-family:monospace;font-size:.7rem;color:#00d4aa;text-transform:uppercase;
+                      letter-spacing:.06em;margin-bottom:.35rem">OpenAI</div>
+          <div style="font-size:.8rem;color:#94a3b8;margin-bottom:.4rem">
+            platform.openai.com &rarr; API keys
+          </div>
+          <div style="font-family:monospace;font-size:.72rem;color:#64748b">
+            Key format: <span style="color:#e2e8f0">sk-…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div style="margin-bottom:2rem">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+      <span style="background:#76B900;color:#0f172a;font-family:monospace;font-weight:800;
+                   font-size:.7rem;width:22px;height:22px;border-radius:50%;display:flex;
+                   align-items:center;justify-content:circle;flex-shrink:0">2</span>
+      <h2 style="font-family:monospace;font-size:1rem;font-weight:700;color:#e2e8f0;
+                 text-transform:uppercase;letter-spacing:.06em;margin:0">
+        Add the key in Settings
+      </h2>
+    </div>
+    <div style="border-left:2px solid #1e293b;margin-left:11px;padding-left:1.5rem">
+      <p style="color:#94a3b8;font-size:.85rem;margin:0 0 .75rem 0">
+        Go to <strong style="color:#e2e8f0">Settings &rarr; LLM APIs</strong> and click
+        <strong style="color:#e2e8f0">Add Key</strong>. Select the provider, give it a label
+        (e.g. "Production"), and paste the key.
+      </p>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;
+                  padding:.8rem 1rem;font-size:.8rem;color:#64748b">
+        Keys are encrypted with AES-256 (Fernet) before storage and never displayed in plaintext.
+        You can add multiple keys per provider.
+      </div>
+      <div style="margin-top:.75rem">
+        <a href="{% url 'monitor:settings_llm_providers' %}"
+           style="display:inline-block;background:#76B900;color:#0f172a;font-family:monospace;
+                  font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;
+                  text-decoration:none;padding:.45rem 1.1rem;border-radius:5px">
+          Go to Settings &rarr; LLM APIs
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div style="margin-bottom:2.5rem">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+      <span style="background:#76B900;color:#0f172a;font-family:monospace;font-weight:800;
+                   font-size:.7rem;width:22px;height:22px;border-radius:50%;display:flex;
+                   align-items:center;justify-content:center;flex-shrink:0">3</span>
+      <h2 style="font-family:monospace;font-size:1rem;font-weight:700;color:#e2e8f0;
+                 text-transform:uppercase;letter-spacing:.06em;margin:0">
+        Sync data
+      </h2>
+    </div>
+    <div style="border-left:2px solid #1e293b;margin-left:11px;padding-left:1.5rem">
+      <p style="color:#94a3b8;font-size:.85rem;margin:0 0 .75rem 0">
+        Click <strong style="color:#e2e8f0">Sync Now</strong> next to your provider to pull the last
+        32 days of usage immediately. After that, data syncs automatically every hour.
+      </p>
+      <p style="color:#94a3b8;font-size:.85rem;margin:0">
+        Once synced, the <a href="{% url 'monitor:llm_dashboard' %}" style="color:#76B900">LLM APIs dashboard</a>
+        will show spend totals, projected month-end cost, and a per-model breakdown.
+      </p>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:1.5rem">
+    <h2 style="font-family:monospace;font-size:.85rem;font-weight:700;color:#e2e8f0;
+               text-transform:uppercase;letter-spacing:.06em;margin:0 0 1.25rem 0">
+      FAQ
+    </h2>
+
+    <div style="margin-bottom:1.1rem">
+      <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.25rem">
+        How often does data sync?
+      </div>
+      <div style="font-size:.82rem;color:#64748b">
+        Automatically every hour. You can also click Sync Now for an immediate refresh.
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.1rem">
+      <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.25rem">
+        What date range is covered?
+      </div>
+      <div style="font-size:.82rem;color:#64748b">
+        Each sync fetches the last 32 days. The dashboard shows the current calendar month.
+        The daily chart shows the last 30 days.
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.1rem">
+      <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.25rem">
+        Why is the dashboard showing no data?
+      </div>
+      <div style="font-size:.82rem;color:#64748b">
+        Either no sync has run yet (click Sync Now), or your account has no usage in the current month.
+        Check the Last Synced column in Settings &rarr; LLM APIs.
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.1rem">
+      <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.25rem">
+        What permissions are needed to add a provider key?
+      </div>
+      <div style="font-size:.82rem;color:#64748b">
+        Owner or Admin role. Viewers can see the dashboard but cannot add, delete, or sync providers.
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.1rem">
+      <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.25rem">
+        What is "Cache Hit Rate"?
+      </div>
+      <div style="font-size:.82rem;color:#64748b">
+        Anthropic only. The percentage of input tokens served from prompt cache
+        (<code style="font-size:.78rem;color:#94a3b8">cache_read_tokens / (input_tokens + cache_read_tokens)</code>).
+        Higher is cheaper — cached tokens cost ~10% of full input tokens.
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.25rem">
+        Can I add multiple keys for the same provider?
+      </div>
+      <div style="font-size:.82rem;color:#64748b">
+        Yes. Each key syncs independently and usage is aggregated per organization.
+        Useful if you have separate keys for staging and production.
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
