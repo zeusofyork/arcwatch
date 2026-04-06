@@ -15,8 +15,8 @@ def cost_dashboard(request):
     """
     Render the cost attribution dashboard.
 
-    Uses the first available organization (demo mode) so the dashboard
-    is always populated without requiring login.
+    Uses the first available organization that has GPUs, falling back
+    to the first org overall if none have GPUs yet.
     """
     # Use the first org that has GPUs; fall back to first org overall
     org = (

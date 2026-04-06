@@ -1,10 +1,15 @@
-# monitor/views/settings_views.py (minimal stub for now)
+"""
+monitor/views/settings_views.py -- Settings management views (API Keys, Alert Rules, Resources, Members).
+"""
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.http import HttpResponse
 
 
+# ── Shared helpers (used by all settings views) ───────────────────────────────
+
 def _get_org(user):
+    """Return the organization for the logged-in user, or None."""
     try:
         return user.profile.organization
     except Exception:
@@ -12,6 +17,7 @@ def _get_org(user):
 
 
 def _is_admin(user):
+    """Return True if the user has admin or owner role."""
     try:
         return user.profile.role in ('admin', 'owner')
     except Exception:
