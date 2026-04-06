@@ -14,6 +14,8 @@ from monitor.views.settings_views import (
     create_endpoint, deactivate_endpoint, delete_endpoint,
     change_member_role, remove_member, invite_member,
     revoke_invite, resend_invite,
+    settings_llm_providers, create_llm_provider, delete_llm_provider,
+    toggle_llm_provider, sync_llm_provider,
 )
 
 app_name = 'monitor'
@@ -49,6 +51,11 @@ urlpatterns = [
     path('settings/members/invite/', invite_member, name='invite_member'),
     path('settings/members/invite/<uuid:token>/revoke/', revoke_invite, name='revoke_invite'),
     path('settings/members/invite/<uuid:token>/resend/', resend_invite, name='resend_invite'),
+    path('settings/llm-providers/', settings_llm_providers, name='settings_llm_providers'),
+    path('settings/llm-providers/create/', create_llm_provider, name='create_llm_provider'),
+    path('settings/llm-providers/<uuid:provider_id>/delete/', delete_llm_provider, name='delete_llm_provider'),
+    path('settings/llm-providers/<uuid:provider_id>/toggle/', toggle_llm_provider, name='toggle_llm_provider'),
+    path('settings/llm-providers/<uuid:provider_id>/sync/', sync_llm_provider, name='sync_llm_provider'),
 
     # ── REST API ──────────────────────────────────────────────────────────────
     path('api/v1/ingest/gpu/', ingest_gpu, name='api_ingest_gpu'),

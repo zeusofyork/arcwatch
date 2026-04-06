@@ -15,7 +15,8 @@ from monitor.forms import (
     APIKeyCreateForm, AlertRuleForm, InviteForm,
     GPUClusterForm, InferenceEndpointForm, AcceptInviteForm,
 )
-from monitor.models import APIKey, AlertRule, Invite, GPUCluster, GPUNode, InferenceEndpoint
+from monitor.models import APIKey, AlertRule, Invite, GPUCluster, GPUNode, InferenceEndpoint, LLMProvider
+from monitor.services.llm_sync_engine import encrypt_api_key, sync_provider
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -415,3 +416,93 @@ def accept_invite(request, token):
         'form': form,
         'invite': invite,
     })
+
+
+# ── LLM Providers ─────────────────────────────────────────────────────────────
+
+@login_required
+def settings_llm_providers(request):
+    org = _get_org(request.user)
+    synced_raw = request.GET.get("synced")
+    try:
+        synced = int(synced_raw) if synced_raw is not None else None
+    except (ValueError, TypeError):
+        synced = None
+    error = request.GET.get("error")
+    providers = org.llm_providers.all() if org else []
+    return render(request, "monitor/settings_llm_providers.html", {
+        "active_tab": "llm-providers",
+        "org": org,
+        "is_admin": _is_admin(request.user),
+        "providers": providers,
+        "synced": synced,
+        "error": error,
+    })
+
+
+@login_required
+@require_admin
+def create_llm_provider(request):
+    if request.method != "POST":
+        return redirect("/settings/llm-providers/")
+    org = _get_org(request.user)
+    if org is None:
+        return HttpResponseForbidden("No organization.")
+    raw_key = request.POST.get("api_key", "").strip()
+    provider = request.POST.get("provider", "").strip()
+    label = request.POST.get("label", "").strip()
+    if not raw_key or not provider or not label:
+        return redirect("/settings/llm-providers/")
+    valid_providers = {c[0] for c in LLMProvider.PROVIDER_CHOICES}
+    if provider not in valid_providers:
+        return redirect("/settings/llm-providers/")
+    LLMProvider.objects.create(
+        organization=org,
+        provider=provider,
+        label=label,
+        api_key_encrypted=encrypt_api_key(raw_key),
+    )
+    return redirect("/settings/llm-providers/")
+
+
+@login_required
+@require_admin
+def delete_llm_provider(request, provider_id):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    org = _get_org(request.user)
+    p = get_object_or_404(LLMProvider, pk=provider_id, organization=org)
+    p.delete()
+    return HttpResponse("")
+
+
+@login_required
+@require_admin
+def toggle_llm_provider(request, provider_id):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    org = _get_org(request.user)
+    p = get_object_or_404(LLMProvider, pk=provider_id, organization=org)
+    p.is_active = not p.is_active
+    p.save(update_fields=["is_active"])
+    color = "#4ade80" if p.is_active else "#64748b"
+    label = "active" if p.is_active else "inactive"
+    return HttpResponse(
+        f'<span style="background:rgba(0,0,0,.1);border:1px solid {color}40;color:{color};'
+        f'font-size:.62rem;padding:2px 7px;border-radius:10px">{label}</span>'
+    )
+
+
+@login_required
+@require_admin
+def sync_llm_provider(request, provider_id):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    org = _get_org(request.user)
+    p = get_object_or_404(LLMProvider, pk=provider_id, organization=org)
+    try:
+        count = sync_provider(str(p.pk))
+        return redirect(f"/settings/llm-providers/?synced={count}")
+    except Exception as exc:
+        import urllib.parse
+        return redirect(f"/settings/llm-providers/?error={urllib.parse.quote(str(exc)[:120])}")

@@ -262,3 +262,75 @@ class SyncProviderTest(TestCase):
             count = sync_provider(str(self.provider.id))
         mock_get.assert_not_called()
         self.assertEqual(count, 0)
+
+
+class LLMProviderSettingsTest(TestCase):
+    def setUp(self):
+        self.org = _make_org("settingsllm")
+        self.user = self.org.owner
+        self.user.profile.organization = self.org
+        self.user.profile.role = "owner"
+        self.user.profile.save()
+        self.client.force_login(self.user)
+        from monitor.services.llm_sync_engine import encrypt_api_key
+        self.provider = LLMProvider.objects.create(
+            organization=self.org,
+            provider="anthropic",
+            label="Prod Key",
+            api_key_encrypted=encrypt_api_key("sk-ant-real"),
+        )
+
+    def test_settings_page_returns_200(self):
+        resp = self.client.get("/settings/llm-providers/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Prod Key")
+
+    def test_create_provider(self):
+        resp = self.client.post("/settings/llm-providers/create/", {
+            "provider": "openai",
+            "label": "OpenAI Key",
+            "api_key": "sk-openai-test",
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(LLMProvider.objects.filter(label="OpenAI Key", organization=self.org).exists())
+
+    def test_create_provider_encrypts_key(self):
+        self.client.post("/settings/llm-providers/create/", {
+            "provider": "openai",
+            "label": "Encrypted Key",
+            "api_key": "sk-plaintext",
+        })
+        p = LLMProvider.objects.get(label="Encrypted Key")
+        self.assertNotEqual(p.api_key_encrypted, "sk-plaintext")
+        from monitor.services.llm_sync_engine import decrypt_api_key
+        self.assertEqual(decrypt_api_key(p.api_key_encrypted), "sk-plaintext")
+
+    def test_delete_provider(self):
+        resp = self.client.post(f"/settings/llm-providers/{self.provider.pk}/delete/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(LLMProvider.objects.filter(pk=self.provider.pk).exists())
+
+    def test_toggle_provider(self):
+        self.assertTrue(self.provider.is_active)
+        resp = self.client.post(f"/settings/llm-providers/{self.provider.pk}/toggle/")
+        self.assertEqual(resp.status_code, 200)
+        self.provider.refresh_from_db()
+        self.assertFalse(self.provider.is_active)
+
+    def test_viewer_cannot_create(self):
+        viewer = User.objects.create_user(username="viewer-llm", password="pw")
+        viewer.profile.organization = self.org
+        viewer.profile.role = "viewer"
+        viewer.profile.save()
+        self.client.force_login(viewer)
+        resp = self.client.post("/settings/llm-providers/create/", {
+            "provider": "openai", "label": "X", "api_key": "sk-x",
+        })
+        self.assertEqual(resp.status_code, 403)
+
+    def test_manual_sync(self):
+        from unittest.mock import patch
+        with patch("monitor.views.settings_views.sync_provider", return_value=5):
+            resp = self.client.post(f"/settings/llm-providers/{self.provider.pk}/sync/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("synced=5", resp["Location"])

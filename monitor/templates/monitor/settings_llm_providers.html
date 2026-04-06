@@ -1,0 +1,152 @@
+{% extends "monitor/settings_base.html" %}
+{% block settings_content %}
+
+{% if synced %}
+<div style="background:rgba(118,185,0,.1);border:1px solid rgba(118,185,0,.3);color:#4ade80;
+            padding:.6rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.85rem">
+  Sync complete — {{ synced }} record{{ synced|pluralize }} updated.
+</div>
+{% endif %}
+{% if error %}
+<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;
+            padding:.6rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.85rem">
+  Sync failed: {{ error }}
+</div>
+{% endif %}
+
+<!-- Provider list -->
+<div style="background:#1e293b;border:1px solid #334155;border-radius:8px;margin-bottom:2rem">
+  <div style="padding:.75rem 1.25rem;border-bottom:1px solid #334155;
+              display:flex;align-items:center;justify-content:space-between">
+    <span style="font-family:monospace;font-weight:700;font-size:.95rem;
+                 color:#e2e8f0;text-transform:uppercase;letter-spacing:.05em">
+      Configured Providers
+    </span>
+  </div>
+  {% if providers %}
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:1px solid #334155">
+        <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                   font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Label</th>
+        <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                   font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Provider</th>
+        <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                   font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Last Synced</th>
+        <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                   font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Status</th>
+        <th style="padding:.5rem 1.25rem;text-align:left;font-family:monospace;
+                   font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in providers %}
+      <tr style="border-bottom:1px solid #1e293b" id="llm-row-{{ p.pk }}">
+        <td style="padding:.65rem 1.25rem;color:#e2e8f0;font-size:.85rem">{{ p.label }}</td>
+        <td style="padding:.65rem 1.25rem">
+          <span style="background:rgba(118,185,0,.1);border:1px solid rgba(118,185,0,.25);
+                       color:#76B900;font-size:.65rem;padding:2px 8px;border-radius:10px;
+                       font-family:monospace;text-transform:uppercase">{{ p.provider }}</span>
+        </td>
+        <td style="padding:.65rem 1.25rem;font-family:monospace;font-size:.72rem;color:#64748b">
+          {{ p.last_synced_at|date:"M d, H:i"|default:"Never" }}
+        </td>
+        <td style="padding:.65rem 1.25rem" id="toggle-{{ p.pk }}">
+          {% if p.is_active %}
+          <span style="background:rgba(0,0,0,.1);border:1px solid #4ade8040;color:#4ade80;
+                       font-size:.62rem;padding:2px 7px;border-radius:10px">active</span>
+          {% else %}
+          <span style="background:rgba(0,0,0,.1);border:1px solid #64748b40;color:#64748b;
+                       font-size:.62rem;padding:2px 7px;border-radius:10px">inactive</span>
+          {% endif %}
+        </td>
+        <td style="padding:.65rem 1.25rem;display:flex;gap:.5rem;align-items:center">
+          {% if is_admin %}
+          <form method="post" action="{% url 'monitor:sync_llm_provider' p.pk %}">
+            {% csrf_token %}
+            <button type="submit"
+              style="background:rgba(118,185,0,.1);border:1px solid rgba(118,185,0,.25);
+                     color:#76B900;font-size:.7rem;padding:3px 10px;border-radius:4px;
+                     cursor:pointer;font-family:monospace;text-transform:uppercase;
+                     letter-spacing:.05em">Sync Now</button>
+          </form>
+          <button hx-post="{% url 'monitor:toggle_llm_provider' p.pk %}"
+                  hx-target="#toggle-{{ p.pk }}" hx-swap="innerHTML"
+                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                  style="background:transparent;border:1px solid #334155;color:#64748b;
+                         font-size:.7rem;padding:3px 8px;border-radius:4px;cursor:pointer">Toggle</button>
+          <button hx-post="{% url 'monitor:delete_llm_provider' p.pk %}"
+                  hx-target="#llm-row-{{ p.pk }}" hx-swap="outerHTML"
+                  hx-confirm="Delete this provider key? This cannot be undone."
+                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                  style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
+                         color:#f87171;font-size:.7rem;padding:3px 8px;border-radius:4px;cursor:pointer">Delete</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:2rem 1.25rem;color:#64748b;font-size:.85rem;text-align:center">
+    No providers configured yet.
+  </div>
+  {% endif %}
+</div>
+
+{% if is_admin %}
+<!-- Add provider form -->
+<div style="background:#1e293b;border:1px solid #334155;border-radius:8px">
+  <div style="padding:.75rem 1.25rem;border-bottom:1px solid #334155">
+    <span style="font-family:monospace;font-weight:700;font-size:.95rem;
+                 color:#e2e8f0;text-transform:uppercase;letter-spacing:.05em">
+      Add Provider
+    </span>
+  </div>
+  <form method="post" action="{% url 'monitor:create_llm_provider' %}"
+        style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:1rem;align-items:end">
+    {% csrf_token %}
+    <div>
+      <label style="font-family:monospace;font-size:.65rem;color:#64748b;
+                    text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem">
+        Provider
+      </label>
+      <select name="provider"
+              style="width:100%;background:#0f172a;border:1px solid #334155;
+                     color:#e2e8f0;padding:.45rem .75rem;border-radius:5px;font-size:.85rem">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-family:monospace;font-size:.65rem;color:#64748b;
+                    text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem">
+        Label
+      </label>
+      <input type="text" name="label" placeholder="e.g. Production Key" required
+             style="width:100%;background:#0f172a;border:1px solid #334155;
+                    color:#e2e8f0;padding:.45rem .75rem;border-radius:5px;font-size:.85rem">
+    </div>
+    <div>
+      <label style="font-family:monospace;font-size:.65rem;color:#64748b;
+                    text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem">
+        API Key
+      </label>
+      <input type="password" name="api_key" placeholder="sk-ant-api03-… or sk-…" required
+             style="width:100%;background:#0f172a;border:1px solid #334155;
+                    color:#e2e8f0;padding:.45rem .75rem;border-radius:5px;font-size:.85rem">
+    </div>
+    <button type="submit"
+            style="background:#76B900;color:#0f172a;border:none;padding:.5rem 1.25rem;
+                   border-radius:5px;font-family:monospace;font-weight:700;font-size:.85rem;
+                   text-transform:uppercase;letter-spacing:.06em;cursor:pointer;white-space:nowrap">
+      Add Key
+    </button>
+  </form>
+  <p style="padding:0 1.25rem 1rem;font-size:.75rem;color:#64748b">
+    API keys are encrypted before storage and never displayed in plaintext.
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}
