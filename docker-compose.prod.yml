@@ -4,17 +4,13 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     env_file: .env.prod
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-arcwatch}
-      POSTGRES_USER: ${POSTGRES_USER:-arcwatch}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arcwatch} -d ${POSTGRES_DB:-arcwatch}"]
+      test: ["CMD-SHELL", "pg_isready -U arcwatch -d arcwatch"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
     restart: unless-stopped
 
   redis:

@@ -34,9 +34,11 @@ chmod 600 "$APP_DIR/.env.prod"
 
 echo "=== [3/5] Docker compose up ==="
 cd "$APP_DIR"
-docker compose -f docker-compose.prod.yml up -d --build
-sleep 20
-docker compose -f docker-compose.prod.yml ps
+# --env-file loads .env.prod for ${VAR} interpolation in docker-compose.prod.yml
+COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.prod"
+$COMPOSE up -d --build
+sleep 30
+$COMPOSE ps
 
 echo "=== [4/5] Nginx config ==="
 cp "$APP_DIR/scripts/nginx-arcwatch.conf" /etc/nginx/sites-available/arcwatch
@@ -50,7 +52,7 @@ HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8001/ 2>/dev/null
 echo "Local health check: $HTTP"
 if [ "$HTTP" = "000" ] || [ "$HTTP" = "502" ] || [ "$HTTP" = "503" ]; then
     echo "WARNING: web container not responding on port 8001"
-    docker compose -f "$APP_DIR/docker-compose.prod.yml" logs --tail=40
+    $COMPOSE logs --tail=40
 fi
 
 echo "=== Deploy complete ==="
