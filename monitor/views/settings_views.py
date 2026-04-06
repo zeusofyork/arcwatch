@@ -16,7 +16,7 @@ from monitor.forms import (
     GPUClusterForm, InferenceEndpointForm, AcceptInviteForm,
 )
 from monitor.models import APIKey, AlertRule, Invite, GPUCluster, GPUNode, InferenceEndpoint, LLMProvider
-from monitor.services.llm_sync_engine import encrypt_api_key, sync_provider
+from monitor.services.llm_sync_engine import encrypt_api_key, sync_provider, sync_claude_code
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -502,6 +502,13 @@ def sync_llm_provider(request, provider_id):
     p = get_object_or_404(LLMProvider, pk=provider_id, organization=org)
     try:
         count = sync_provider(str(p.pk))
+        # Also pull Claude Code analytics if this is an Anthropic key
+        if p.provider == "anthropic":
+            try:
+                sync_claude_code(str(p.pk))
+            except Exception as cc_exc:
+                import logging
+                logging.getLogger(__name__).warning("Claude Code sync skipped: %s", cc_exc)
         return redirect(f"/settings/llm-providers/?synced={count}")
     except Exception as exc:
         import urllib.parse

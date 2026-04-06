@@ -220,7 +220,11 @@ class ClaudeCodeAdapter:
     Fetches per-user daily Claude Code activity from the Anthropic Admin API.
 
     Endpoint: GET /v1/organizations/usage_report/claude_code
-    Requires the same Admin API key (sk-ant-admin-…) as AnthropicAdapter.
+    Docs: https://docs.anthropic.com/en/api/admin-api/claude-code/get-claude-code-usage-report
+
+    The endpoint accepts ONE date at a time (starting_at = YYYY-MM-DD).
+    Multiple terminal sessions for the same user on the same day are separate
+    records — we aggregate them into a single (date, user_email) row.
 
     Returns a list of dicts with keys:
       date, user_email, customer_type,
@@ -234,85 +238,74 @@ class ClaudeCodeAdapter:
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
         }
-        starting_at = f"{since_date.isoformat()}T00:00:00Z"
-        ending_at = f"{(until_date + datetime.timedelta(days=1)).isoformat()}T00:00:00Z"
 
-        params: list = [
-            ("starting_at", starting_at),
-            ("ending_at", ending_at),
-            ("bucket_width", "1d"),
-            ("limit", 31),
-        ]
+        # Key: (date, actor_id) → aggregated record dict
+        aggregated: dict = {}
 
-        raw_buckets = []
-        while True:
-            resp = requests.get(self.URL, headers=headers, params=params, timeout=30)
-            if resp.status_code != 200:
-                raise RuntimeError(
-                    f"Claude Code analytics API returned {resp.status_code}: {resp.text[:200]}"
-                )
-            body = resp.json()
-            raw_buckets.extend(body.get("data", []))
-            if not body.get("has_more", False):
-                break
-            next_page = body.get("next_page")
-            if not next_page:
-                break
-            params = [(k, v) for k, v in params if k != "page"] + [("page", next_page)]
-
-        records = []
-        for bucket in raw_buckets:
-            try:
-                day = datetime.date.fromisoformat(bucket["starting_at"][:10])
-            except (ValueError, KeyError):
-                continue
-            for result in bucket.get("results", []):
-                email = result.get("user_email") or result.get("email") or "unknown"
-
-                # Aggregate token counts across all models used that day
-                input_tok = output_tok = cache_read = 0
-                models_data = result.get("models") or result.get("model_breakdown") or {}
-                if isinstance(models_data, dict):
-                    for m in models_data.values():
-                        input_tok += int(m.get("input_tokens", 0))
-                        output_tok += int(m.get("output_tokens", 0))
-                        cache_read += int(
-                            m.get("cache_read_input_tokens", 0) or
-                            m.get("cache_read_tokens", 0)
-                        )
-                else:
-                    # Flat token fields as fallback
-                    input_tok = int(result.get("input_tokens", 0))
-                    output_tok = int(result.get("output_tokens", 0))
-                    cache_read = int(
-                        result.get("cache_read_input_tokens", 0) or
-                        result.get("cache_read_tokens", 0)
+        day = since_date
+        while day <= until_date:
+            params: dict = {"starting_at": day.isoformat(), "limit": 1000}
+            while True:
+                resp = requests.get(self.URL, headers=headers, params=params, timeout=30)
+                if resp.status_code != 200:
+                    raise RuntimeError(
+                        f"Claude Code analytics API returned {resp.status_code}: {resp.text[:200]}"
                     )
+                body = resp.json()
 
-                records.append({
-                    "date": day,
-                    "user_email": email,
-                    "customer_type": result.get("customer_type", "api"),
-                    "sessions": int(result.get("num_sessions", result.get("sessions", 0))),
-                    "lines_added": int(
-                        result.get("lines_of_code_added", result.get("lines_added", 0))
-                    ),
-                    "lines_removed": int(
-                        result.get("lines_of_code_deleted", result.get("lines_removed", 0))
-                    ),
-                    "commits": int(result.get("num_commits", result.get("commits", 0))),
-                    "prs": int(result.get("num_prs", result.get("prs", 0))),
-                    "input_tokens": input_tok,
-                    "output_tokens": output_tok,
-                    "cache_read_tokens": cache_read,
-                    "cost_usd": float(
-                        result.get("cost_usd") or
-                        result.get("num_cost_estimate_usd") or
-                        result.get("estimated_cost_usd") or 0.0
-                    ),
-                })
+                for item in body.get("data", []):
+                    actor = item.get("actor", {})
+                    actor_type = actor.get("type", "")
+                    if actor_type == "user_actor":
+                        actor_id = actor.get("email_address", "unknown")
+                    else:
+                        actor_id = actor.get("api_key_name", "api-key")
 
-        return records
+                    key = (day, actor_id)
+                    if key not in aggregated:
+                        aggregated[key] = {
+                            "date": day,
+                            "user_email": actor_id,
+                            "customer_type": item.get("customer_type", "api"),
+                            "sessions": 0,
+                            "lines_added": 0,
+                            "lines_removed": 0,
+                            "commits": 0,
+                            "prs": 0,
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "cache_read_tokens": 0,
+                            "cost_usd": 0.0,
+                        }
+
+                    r = aggregated[key]
+                    metrics = item.get("core_metrics", {})
+                    loc = metrics.get("lines_of_code", {})
+                    r["sessions"] += int(metrics.get("num_sessions", 0))
+                    r["lines_added"] += int(loc.get("added", 0))
+                    r["lines_removed"] += int(loc.get("removed", 0))
+                    r["commits"] += int(metrics.get("commits_by_claude_code", 0))
+                    r["prs"] += int(metrics.get("pull_requests_by_claude_code", 0))
+
+                    for mb in item.get("model_breakdown", []):
+                        toks = mb.get("tokens", {})
+                        r["input_tokens"] += int(toks.get("input", 0))
+                        r["output_tokens"] += int(toks.get("output", 0))
+                        r["cache_read_tokens"] += int(toks.get("cache_read", 0))
+                        cost = mb.get("estimated_cost", {})
+                        # amount is in minor currency units (cents)
+                        r["cost_usd"] += int(cost.get("amount", 0)) / 100.0
+
+                if not body.get("has_more", False):
+                    break
+                next_page = body.get("next_page")
+                if not next_page:
+                    break
+                params = {"starting_at": day.isoformat(), "limit": 1000, "page": next_page}
+
+            day += datetime.timedelta(days=1)
+
+        return list(aggregated.values())
 
 
 # ── sync_provider ─────────────────────────────────────────────────────────────
