@@ -102,12 +102,23 @@ def create_alert_rule(request):
     if request.method != 'POST':
         return redirect('/settings/alert-rules/')
     org = _get_org(request.user)
+    if org is None:
+        return HttpResponseForbidden("No organization.")
     form = AlertRuleForm(request.POST)
     if form.is_valid():
         rule = form.save(commit=False)
         rule.organization = org
         rule.save()
-    return redirect('/settings/alert-rules/')
+        return redirect('/settings/alert-rules/')
+    # Re-render page with form errors
+    return render(request, 'monitor/settings_alert_rules.html', {
+        'active_tab': 'alert-rules',
+        'org': org,
+        'is_admin': True,
+        'rules': org.alert_rules.all(),
+        'form': form,
+        'show_form': True,
+    })
 
 
 @login_required
@@ -120,7 +131,7 @@ def toggle_alert_rule(request, rule_id):
     rule.is_enabled = not rule.is_enabled
     rule.save(update_fields=['is_enabled'])
     return render(request, 'monitor/fragments/alert_rule_toggle.html', {
-        'rule': rule, 'is_admin': True,
+        'rule': rule, 'is_admin': _is_admin(request.user),
     })
 
 

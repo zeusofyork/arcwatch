@@ -59,10 +59,16 @@
 </table>
 
 {% if is_admin %}
-<div id="rule-form" style="display:none;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:18px">
+<div id="rule-form" style="display:{% if show_form %}block{% else %}none{% endif %};background:#111827;border:1px solid #1e293b;border-radius:6px;padding:18px">
   <div style="font-size:.8rem;font-weight:700;color:#e2e8f0;font-family:monospace;margin-bottom:14px">New Rule</div>
   <form method="post" action="/settings/alert-rules/create/">
     {% csrf_token %}
+    {% if form.errors %}
+    <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:.72rem;color:#f87171">
+      {% for field in form %}{% for error in field.errors %}<div>{{ field.label }}: {{ error }}</div>{% endfor %}{% endfor %}
+      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+    {% endif %}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
       <div>
         <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Name</label>

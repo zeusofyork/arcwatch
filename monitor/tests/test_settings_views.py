@@ -222,3 +222,17 @@ class AlertRulesPageTest(TestCase):
         response = self.client.post(f'/settings/alert-rules/{self.rule.id}/delete/')
         self.assertEqual(response.status_code, 200)
         self.assertFalse(AlertRule.objects.filter(pk=self.rule.id).exists())
+
+    def test_cross_org_toggle_returns_404(self):
+        """User from org B cannot toggle a rule belonging to org A."""
+        other_user, other_org = _make_user_and_org('ar_other', role='owner')
+        self.client.login(username='ar_other', password='pw')
+        response = self.client.post(f'/settings/alert-rules/{self.rule.id}/toggle/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_cross_org_delete_returns_404(self):
+        """User from org B cannot delete a rule belonging to org A."""
+        other_user, other_org = _make_user_and_org('ar_other2', role='owner')
+        self.client.login(username='ar_other2', password='pw')
+        response = self.client.post(f'/settings/alert-rules/{self.rule.id}/delete/')
+        self.assertEqual(response.status_code, 404)
