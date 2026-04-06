@@ -81,7 +81,7 @@ func (e *InferenceExporter) Export(raw map[string]float64) error {
 	respBody, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		log.Printf("inference exporter: status %d: %s", resp.StatusCode, string(respBody))
 	}
 	return nil
