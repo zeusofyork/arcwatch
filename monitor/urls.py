@@ -7,7 +7,7 @@ from monitor.views.cost_views import cost_dashboard
 from monitor.views.alert_views import alerts_dashboard
 from monitor.views.settings_views import (
     settings_root, settings_api_keys, settings_alert_rules,
-    settings_resources, settings_members,
+    settings_resources, settings_members, revoke_api_key,
 )
 
 app_name = 'monitor'
@@ -22,6 +22,7 @@ urlpatterns = [
     # ── Settings views ────────────────────────────────────────────────────────
     path('settings/', settings_root, name='settings_root'),
     path('settings/api-keys/', settings_api_keys, name='settings_api_keys'),
+    path('settings/api-keys/<uuid:key_id>/revoke/', revoke_api_key, name='revoke_api_key'),
     path('settings/alert-rules/', settings_alert_rules, name='settings_alert_rules'),
     path('settings/resources/', settings_resources, name='settings_resources'),
     path('settings/members/', settings_members, name='settings_members'),

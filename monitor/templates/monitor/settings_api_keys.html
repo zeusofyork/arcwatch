@@ -1,5 +1,86 @@
 {% extends "monitor/settings_base.html" %}
 {% block settings_content %}
-<h2 style="font-family:monospace;color:#e2e8f0;font-size:.95rem;margin:0 0 4px 0">API Keys</h2>
-<p style="color:#64748b;font-size:.72rem">Keys for programmatic access</p>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+  <div>
+    <h2 style="font-family:monospace;color:#e2e8f0;font-size:.95rem;margin:0 0 4px 0">API Keys</h2>
+    <p style="color:#64748b;font-size:.72rem;margin:0">Keys for programmatic access (Go agent, CI pipelines)</p>
+  </div>
+</div>
+
+{% if new_raw_key %}
+<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:14px;margin-bottom:20px">
+  <div style="font-size:.75rem;font-weight:700;color:#fbbf24;margin-bottom:6px">⚠ Copy this key now — it will not be shown again</div>
+  <code style="font-family:monospace;font-size:.82rem;color:#e2e8f0;background:#1e293b;padding:8px 14px;border-radius:4px;display:block;word-break:break-all">{{ new_raw_key }}</code>
+</div>
+{% endif %}
+
+<table style="width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:28px">
+  <thead>
+    <tr style="border-bottom:1px solid #1e293b">
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Prefix</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Name</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Scopes</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Last Used</th>
+      <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Status</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for key in api_keys %}
+    <tr id="api-key-{{ key.id }}" style="border-bottom:1px solid #1e293b{% if not key.active %};opacity:.5{% endif %}">
+      <td style="padding:9px 10px;color:#94a3b8;font-family:monospace;font-size:.78rem">{{ key.key_prefix }}…</td>
+      <td style="padding:9px 10px;color:#e2e8f0">{{ key.name }}</td>
+      <td style="padding:9px 10px">
+        {% for s in key.scopes %}
+        <span style="background:#1e293b;color:#64748b;font-size:.62rem;padding:2px 7px;border-radius:10px;margin-right:4px">{{ s }}</span>
+        {% endfor %}
+      </td>
+      <td style="padding:9px 10px;color:#64748b;font-size:.72rem">{{ key.last_used_at|default:"never" }}</td>
+      <td style="padding:9px 10px">
+        {% if key.active %}
+        <span style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:#4ade80;font-size:.62rem;padding:2px 7px;border-radius:10px">active</span>
+        {% else %}
+        <span style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;font-size:.62rem;padding:2px 7px;border-radius:10px">revoked</span>
+        {% endif %}
+      </td>
+      <td style="padding:9px 10px;text-align:right">
+        {% if is_admin and key.active %}
+        <button hx-post="/settings/api-keys/{{ key.id }}/revoke/"
+                hx-target="#api-key-{{ key.id }}"
+                hx-swap="outerHTML"
+                style="background:transparent;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0">
+          Revoke
+        </button>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" style="padding:20px 10px;color:#475569;text-align:center;font-size:.78rem">No API keys yet</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if is_admin %}
+<div style="background:#111827;border:1px solid #1e293b;border-radius:6px;padding:18px">
+  <div style="font-size:.8rem;font-weight:700;color:#e2e8f0;font-family:monospace;margin-bottom:14px">Create API Key</div>
+  <form method="post">
+    {% csrf_token %}
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Name</label>
+      {{ form.name }}
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Scopes</label>
+      {% for choice in form.scopes %}
+      <label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;font-size:.78rem;color:#94a3b8;cursor:pointer">
+        {{ choice.tag }} {{ choice.choice_label }}
+      </label>
+      {% endfor %}
+    </div>
+    <button type="submit" style="background:#76B900;color:#000;font-weight:700;font-family:monospace;font-size:.78rem;padding:7px 16px;border:none;border-radius:4px;cursor:pointer">
+      Create Key
+    </button>
+  </form>
+</div>
+{% endif %}
 {% endblock %}

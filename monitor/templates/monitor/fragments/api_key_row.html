@@ -1,0 +1,14 @@
+<tr id="api-key-{{ key.id }}" style="border-bottom:1px solid #1e293b;opacity:.5">
+  <td style="padding:9px 10px;color:#94a3b8;font-family:monospace;font-size:.78rem">{{ key.key_prefix }}…</td>
+  <td style="padding:9px 10px;color:#94a3b8">{{ key.name }}</td>
+  <td style="padding:9px 10px">
+    {% for s in key.scopes %}
+    <span style="background:#1e293b;color:#64748b;font-size:.62rem;padding:2px 7px;border-radius:10px;margin-right:4px">{{ s }}</span>
+    {% endfor %}
+  </td>
+  <td style="padding:9px 10px;color:#64748b;font-size:.72rem">{{ key.last_used_at|default:"never" }}</td>
+  <td style="padding:9px 10px">
+    <span style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;font-size:.62rem;padding:2px 7px;border-radius:10px">revoked</span>
+  </td>
+  <td style="padding:9px 10px"></td>
+</tr>

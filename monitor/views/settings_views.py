@@ -3,11 +3,11 @@ monitor/views/settings_views.py -- Settings management views (API Keys, Alert Ru
 """
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
-from monitor.decorators import require_admin
-from monitor.forms import AlertRuleForm, InviteForm
-from monitor.models import Invite
+from monitor.decorators import is_htmx, require_admin
+from monitor.forms import APIKeyCreateForm, AlertRuleForm, InviteForm
+from monitor.models import APIKey, Invite
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -40,12 +40,47 @@ def settings_root(request):
 @login_required
 def settings_api_keys(request):
     org = _get_org(request.user)
+    is_admin = _is_admin(request.user)
+    new_raw_key = None
+
+    if request.method == 'POST':
+        if not is_admin:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Admin access required.")
+        form = APIKeyCreateForm(request.POST)
+        if form.is_valid():
+            _, new_raw_key = APIKey.create_key(
+                organization=org,
+                user=request.user,
+                name=form.cleaned_data['name'],
+                scopes=form.cleaned_data['scopes'],
+            )
+    else:
+        form = APIKeyCreateForm()
+
     return render(request, 'monitor/settings_api_keys.html', {
         'active_tab': 'api-keys',
         'org': org,
-        'is_admin': _is_admin(request.user),
+        'is_admin': is_admin,
         'api_keys': org.api_keys.all() if org else [],
+        'form': form,
+        'new_raw_key': new_raw_key,
     })
+
+
+@login_required
+@require_admin
+def revoke_api_key(request, key_id):
+    org = _get_org(request.user)
+    api_key = get_object_or_404(APIKey, pk=key_id, organization=org)
+    if request.method == 'POST':
+        api_key.active = False
+        api_key.save(update_fields=['active'])
+    if is_htmx(request):
+        return render(request, 'monitor/fragments/api_key_row.html', {
+            'key': api_key, 'is_admin': True,
+        })
+    return redirect('/settings/api-keys/')
 
 
 # ── Alert Rules ───────────────────────────────────────────────────────────────

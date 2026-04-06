@@ -130,3 +130,46 @@ class SettingsNavTest(TestCase):
     def test_members_page_returns_200(self):
         response = self.client.get('/settings/members/')
         self.assertEqual(response.status_code, 200)
+
+
+class APIKeysPageTest(TestCase):
+    def setUp(self):
+        self.admin, self.org = _make_user_and_org('api_admin', role='owner')
+        self.viewer = User.objects.create_user(username='api_viewer', password='pw')
+        self.viewer.profile.organization = self.org
+        self.viewer.profile.role = 'viewer'
+        self.viewer.profile.save()
+
+    def test_create_api_key_returns_raw_key_in_context(self):
+        self.client.login(username='api_admin', password='pw')
+        response = self.client.post('/settings/api-keys/', {
+            'name': 'Test Key',
+            'scopes': ['ingest'],
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('new_raw_key', response.context)
+        self.assertIsNotNone(response.context['new_raw_key'])
+
+    def test_create_api_key_viewer_gets_403(self):
+        self.client.login(username='api_viewer', password='pw')
+        response = self.client.post('/settings/api-keys/', {
+            'name': 'Test Key',
+            'scopes': ['ingest'],
+        })
+        self.assertEqual(response.status_code, 403)
+
+    def test_revoke_sets_active_false(self):
+        from monitor.models import APIKey
+        self.client.login(username='api_admin', password='pw')
+        api_key, _ = APIKey.create_key(self.org, self.admin, 'ToRevoke', ['ingest'])
+        response = self.client.post(f'/settings/api-keys/{api_key.id}/revoke/', follow=True)
+        self.assertEqual(response.status_code, 200)
+        api_key.refresh_from_db()
+        self.assertFalse(api_key.active)
+
+    def test_revoke_viewer_gets_403(self):
+        from monitor.models import APIKey
+        self.client.login(username='api_viewer', password='pw')
+        api_key, _ = APIKey.create_key(self.org, self.admin, 'ToRevoke2', ['ingest'])
+        response = self.client.post(f'/settings/api-keys/{api_key.id}/revoke/')
+        self.assertEqual(response.status_code, 403)
