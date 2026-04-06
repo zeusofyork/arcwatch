@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gpuwatch/agent/internal/collector"
-	"github.com/gpuwatch/agent/internal/exporter"
-	"github.com/gpuwatch/agent/internal/scraper"
-	"github.com/gpuwatch/agent/internal/types"
+	"github.com/arcwatch/agent/internal/collector"
+	"github.com/arcwatch/agent/internal/exporter"
+	"github.com/arcwatch/agent/internal/scraper"
+	"github.com/arcwatch/agent/internal/types"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/gpuwatch/agent/internal/types"
+	"github.com/arcwatch/agent/internal/types"
 )
 
 type GPUCollector struct {

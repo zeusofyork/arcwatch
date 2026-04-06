@@ -1,3 +1,3 @@
-module github.com/gpuwatch/agent
+module github.com/arcwatch/agent
 
 go 1.22

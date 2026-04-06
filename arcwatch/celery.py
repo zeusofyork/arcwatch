@@ -2,9 +2,9 @@ import os
 
 from celery import Celery
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gpuwatch.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'arcwatch.settings')
 
-app = Celery('gpuwatch')
+app = Celery('arcwatch')
 
 app.config_from_object('django.conf:settings', namespace='CELERY')
 

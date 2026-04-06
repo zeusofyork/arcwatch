@@ -3,14 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "gpuwatch"
+name = "arcwatch"
 version = "0.1.0"
 description = "AI/ML Infrastructure GPU Monitoring Platform"
 requires-python = ">=3.11"
 dependencies = []
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "gpuwatch.settings"
+DJANGO_SETTINGS_MODULE = "arcwatch.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

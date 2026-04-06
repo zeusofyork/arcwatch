@@ -4,15 +4,15 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     environment:
-      POSTGRES_DB: gpuwatch
-      POSTGRES_USER: gpuwatch
-      POSTGRES_PASSWORD: gpuwatch
+      POSTGRES_DB: arcwatch
+      POSTGRES_USER: arcwatch
+      POSTGRES_PASSWORD: arcwatch
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gpuwatch -d gpuwatch"]
+      test: ["CMD-SHELL", "pg_isready -U arcwatch -d arcwatch"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,38 +27,53 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build: .
+    command: python manage.py migrate --noinput
+    environment:
+      POSTGRES_DB: arcwatch
+      POSTGRES_USER: arcwatch
+      POSTGRES_PASSWORD: arcwatch
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-docker-secret-key-change-in-prod
+      DEBUG: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app
+    command: gunicorn arcwatch.wsgi:application --bind 0.0.0.0:8000 --workers 2
     ports:
       - "8000:8000"
     environment:
-      POSTGRES_DB: gpuwatch
-      POSTGRES_USER: gpuwatch
-      POSTGRES_PASSWORD: gpuwatch
+      POSTGRES_DB: arcwatch
+      POSTGRES_USER: arcwatch
+      POSTGRES_PASSWORD: arcwatch
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: dev-docker-secret-key-change-in-prod
       DEBUG: "True"
-      ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,web"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery:
     build: .
-    command: celery -A gpuwatch worker --loglevel=info
-    volumes:
-      - .:/app
+    command: celery -A arcwatch worker --loglevel=info
     environment:
-      POSTGRES_DB: gpuwatch
-      POSTGRES_USER: gpuwatch
-      POSTGRES_PASSWORD: gpuwatch
+      POSTGRES_DB: arcwatch
+      POSTGRES_USER: arcwatch
+      POSTGRES_PASSWORD: arcwatch
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379/0
@@ -69,6 +84,34 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  celery-beat:
+    build: .
+    command: celery -A arcwatch beat --loglevel=info
+    environment:
+      POSTGRES_DB: arcwatch
+      POSTGRES_USER: arcwatch
+      POSTGRES_PASSWORD: arcwatch
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-docker-secret-key-change-in-prod
+      DEBUG: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  agent:
+    build: ./agent
+    command: ["--api-url=http://web:8000/api/v1/ingest/gpu/", "--api-key=vtJa0FaP0ez7wKfX354Cp2wPHqq64G9q0-9ZOMaDEAQ", "--cluster=docker-local", "--mock=true", "--interval=15s"]
+    depends_on:
+      - web
 
 volumes:
   pgdata:

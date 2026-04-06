@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gpuwatch/agent/internal/types"
+	"github.com/arcwatch/agent/internal/types"
 )
 
 func TestInferenceExporterPayloadShape(t *testing.T) {

@@ -36,7 +36,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'gpuwatch.urls'
+ROOT_URLCONF = 'arcwatch.urls'
 
 TEMPLATES = [
     {
@@ -54,7 +54,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'gpuwatch.wsgi.application'
+WSGI_APPLICATION = 'arcwatch.wsgi.application'
 
 # Database
 # When USE_SQLITE=1 (e.g. local testing without Docker), use SQLite.
@@ -69,9 +69,9 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('POSTGRES_DB', 'gpuwatch'),
-            'USER': os.environ.get('POSTGRES_USER', 'gpuwatch'),
-            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'gpuwatch'),
+            'NAME': os.environ.get('POSTGRES_DB', 'arcwatch'),
+            'USER': os.environ.get('POSTGRES_USER', 'arcwatch'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'arcwatch'),
             'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
             # Use SQLite for the test runner even with PG config, so tests
@@ -117,7 +117,7 @@ REST_FRAMEWORK = {
 
 # drf-spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'GPUWatch API',
+    'TITLE': 'ArcWatch API',
     'DESCRIPTION': 'AI/ML Infrastructure GPU Monitoring Platform',
     'VERSION': '0.1.0',
 }

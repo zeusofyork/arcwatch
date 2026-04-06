@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gpuwatch/agent/internal/types"
+	"github.com/arcwatch/agent/internal/types"
 )
 
 // InferenceExporter sends vLLM metrics to the Django inference ingest endpoint.
