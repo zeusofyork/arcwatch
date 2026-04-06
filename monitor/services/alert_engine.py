@@ -152,7 +152,7 @@ def _format_message(rule: AlertRule, value) -> str:
 
 def _notify_slack(rule: AlertRule, event: AlertEvent) -> None:
     payload = {
-        "text": f"[ArcWatch] Alert: {rule.name}",
+        "text": f"[GPUWatch] Alert: {rule.name}",
         "blocks": [
             {
                 "type": "section",
