@@ -35,3 +35,6 @@ media/
 .DS_Store
 Thumbs.db
 agent/gpuwatch-agent
+
+# Git worktrees
+.worktrees/
