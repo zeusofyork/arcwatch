@@ -157,6 +157,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "monitor.evaluate_alert_rules",
         "schedule": 60.0,
     },
+    "sync-llm-usage": {
+        "task": "monitor.sync_llm_usage",
+        "schedule": 3600.0,  # every hour
+    },
 }
 
 # Logging
