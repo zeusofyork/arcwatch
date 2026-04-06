@@ -164,6 +164,108 @@ def settings_resources(request):
     })
 
 
+@login_required
+@require_admin
+def create_cluster(request):
+    if request.method != 'POST':
+        return redirect('/settings/resources/')
+    org = _get_org(request.user)
+    from monitor.forms import GPUClusterForm
+    form = GPUClusterForm(request.POST)
+    if form.is_valid():
+        from monitor.models import GPUCluster
+        GPUCluster.objects_unscoped.create(organization=org, name=form.cleaned_data['name'])
+    return redirect('/settings/resources/')
+
+
+@login_required
+@require_admin
+def deactivate_cluster(request, cluster_id):
+    from monitor.models import GPUCluster
+    org = _get_org(request.user)
+    cluster = get_object_or_404(GPUCluster, pk=cluster_id, organization=org)
+    if request.method == 'POST':
+        cluster.is_active = False
+        cluster.save(update_fields=['is_active'])
+    return HttpResponse('<span style="background:rgba(100,116,139,.1);border:1px solid #475569;color:#64748b;font-size:.62rem;padding:2px 7px;border-radius:10px">inactive</span>')
+
+
+@login_required
+@require_admin
+def delete_cluster(request, cluster_id):
+    from monitor.models import GPUCluster
+    org = _get_org(request.user)
+    cluster = get_object_or_404(GPUCluster, pk=cluster_id, organization=org)
+    if request.method == 'POST':
+        cluster.delete()
+    return HttpResponse('')
+
+
+@login_required
+@require_admin
+def deactivate_node(request, node_id):
+    from monitor.models import GPUNode
+    org = _get_org(request.user)
+    node = get_object_or_404(GPUNode, pk=node_id, organization=org)
+    if request.method == 'POST':
+        node.is_active = False
+        node.save(update_fields=['is_active'])
+    return HttpResponse('<span style="background:rgba(100,116,139,.1);border:1px solid #475569;color:#64748b;font-size:.62rem;padding:2px 7px;border-radius:10px">inactive</span>')
+
+
+@login_required
+@require_admin
+def delete_node(request, node_id):
+    from monitor.models import GPUNode
+    org = _get_org(request.user)
+    node = get_object_or_404(GPUNode, pk=node_id, organization=org)
+    if request.method == 'POST':
+        node.delete()
+    return HttpResponse('')
+
+
+@login_required
+@require_admin
+def create_endpoint(request):
+    if request.method != 'POST':
+        return redirect('/settings/resources/?tab=endpoints')
+    org = _get_org(request.user)
+    from monitor.forms import InferenceEndpointForm
+    form = InferenceEndpointForm(request.POST)
+    if form.is_valid():
+        from monitor.models import InferenceEndpoint
+        InferenceEndpoint.objects.create(
+            organization=org,
+            name=form.cleaned_data['name'],
+            engine=form.cleaned_data['engine'],
+            url=form.cleaned_data.get('url', ''),
+        )
+    return redirect('/settings/resources/?tab=endpoints')
+
+
+@login_required
+@require_admin
+def deactivate_endpoint(request, endpoint_id):
+    from monitor.models import InferenceEndpoint
+    org = _get_org(request.user)
+    ep = get_object_or_404(InferenceEndpoint, pk=endpoint_id, organization=org)
+    if request.method == 'POST':
+        ep.is_active = False
+        ep.save(update_fields=['is_active'])
+    return HttpResponse('<span style="background:rgba(100,116,139,.1);border:1px solid #475569;color:#64748b;font-size:.62rem;padding:2px 7px;border-radius:10px">retired</span>')
+
+
+@login_required
+@require_admin
+def delete_endpoint(request, endpoint_id):
+    from monitor.models import InferenceEndpoint
+    org = _get_org(request.user)
+    ep = get_object_or_404(InferenceEndpoint, pk=endpoint_id, organization=org)
+    if request.method == 'POST':
+        ep.delete()
+    return HttpResponse('')
+
+
 # ── Members ───────────────────────────────────────────────────────────────────
 
 @login_required

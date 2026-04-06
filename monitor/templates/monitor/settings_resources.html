@@ -1,5 +1,159 @@
 {% extends "monitor/settings_base.html" %}
 {% block settings_content %}
 <h2 style="font-family:monospace;color:#e2e8f0;font-size:.95rem;margin:0 0 4px 0">Resources</h2>
-<p style="color:#64748b;font-size:.72rem">GPU clusters, nodes, and inference endpoints</p>
+<p style="color:#64748b;font-size:.72rem;margin:0 0 18px 0">GPU clusters, nodes, and inference endpoints</p>
+
+<!-- Tab switcher -->
+<div style="display:flex;border-bottom:1px solid #1e293b;margin-bottom:18px">
+  <a href="?tab=clusters"
+     style="padding:7px 16px;font-size:.78rem;text-decoration:none;border-bottom:2px solid {% if tab == 'clusters' or not tab %}#76B900{% else %}transparent{% endif %};color:{% if tab == 'clusters' or not tab %}#e2e8f0{% else %}#64748b{% endif %}">
+    Clusters &amp; Nodes
+  </a>
+  <a href="?tab=endpoints"
+     style="padding:7px 16px;font-size:.78rem;text-decoration:none;border-bottom:2px solid {% if tab == 'endpoints' %}#76B900{% else %}transparent{% endif %};color:{% if tab == 'endpoints' %}#e2e8f0{% else %}#64748b{% endif %}">
+    Inference Endpoints
+  </a>
+</div>
+
+{% if tab == 'endpoints' %}
+
+  <table style="width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:20px">
+    <thead>
+      <tr style="border-bottom:1px solid #1e293b">
+        <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Name</th>
+        <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Engine</th>
+        <th style="text-align:left;padding:8px 10px;color:#475569;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Status</th>
+        <th style="padding:8px 10px"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ep in endpoints %}
+      <tr id="ep-{{ ep.id }}" style="border-bottom:1px solid #1e293b">
+        <td style="padding:9px 10px;color:#e2e8f0;font-family:monospace;font-size:.8rem">{{ ep.name }}</td>
+        <td style="padding:9px 10px;color:#94a3b8">{{ ep.engine }}</td>
+        <td id="ep-status-{{ ep.id }}" style="padding:9px 10px">
+          <span style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:#4ade80;font-size:.62rem;padding:2px 7px;border-radius:10px">{{ ep.status }}</span>
+        </td>
+        <td style="padding:9px 10px;text-align:right">
+          {% if is_admin %}
+          <span style="display:inline-flex;gap:10px;font-size:.72rem">
+            <button hx-post="/settings/resources/endpoints/{{ ep.id }}/deactivate/"
+                    hx-target="#ep-status-{{ ep.id }}"
+                    hx-swap="innerHTML"
+                    hx-confirm="Deactivate endpoint '{{ ep.name }}'?"
+                    style="background:transparent;border:none;color:#fbbf24;cursor:pointer;padding:0">Deactivate</button>
+            <button hx-post="/settings/resources/endpoints/{{ ep.id }}/delete/"
+                    hx-target="#ep-{{ ep.id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Delete endpoint '{{ ep.name }}'?"
+                    style="background:transparent;border:none;color:#f87171;cursor:pointer;padding:0">Delete</button>
+          </span>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" style="padding:20px 10px;color:#475569;text-align:center;font-size:.78rem">No endpoints yet</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if is_admin %}
+  <div style="background:#111827;border:1px solid #1e293b;border-radius:6px;padding:16px;margin-top:10px">
+    <div style="font-size:.8rem;font-weight:700;color:#e2e8f0;font-family:monospace;margin-bottom:12px">Add Endpoint</div>
+    <form method="post" action="/settings/resources/endpoints/create/" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      {% csrf_token %}
+      <div>
+        <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Name</label>
+        <input name="name" type="text" placeholder="e.g. prod-vllm"
+               style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 12px;border-radius:4px;font-size:.8rem">
+      </div>
+      <div>
+        <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Engine</label>
+        <select name="engine" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 12px;border-radius:4px;font-size:.8rem">
+          <option value="vllm">vLLM</option>
+          <option value="triton">Triton</option>
+          <option value="tgi">TGI</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">URL (optional)</label>
+        <input name="url" type="url" placeholder="http://…"
+               style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 12px;border-radius:4px;font-size:.8rem;width:220px">
+      </div>
+      <button type="submit" style="background:#76B900;color:#000;font-weight:700;font-family:monospace;font-size:.75rem;padding:7px 14px;border:none;border-radius:4px;cursor:pointer">
+        + Add
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+{% else %}
+
+  {% for cluster in clusters %}
+  <div id="cluster-{{ cluster.id }}" style="background:#111827;border:1px solid #1e293b;border-radius:6px;padding:12px 14px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <span style="font-family:monospace;color:#e2e8f0;font-size:.82rem">{{ cluster.name }}</span>
+        <span style="margin-left:10px;color:#64748b;font-size:.68rem">{{ cluster.nodes.count }} node{{ cluster.nodes.count|pluralize }}</span>
+      </div>
+      {% if is_admin %}
+      <div style="display:flex;gap:10px;font-size:.72rem">
+        <button hx-post="/settings/resources/clusters/{{ cluster.id }}/deactivate/"
+                hx-target="#cluster-status-{{ cluster.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Deactivate cluster '{{ cluster.name }}'?"
+                style="background:transparent;border:none;color:#fbbf24;cursor:pointer;padding:0">Deactivate</button>
+        <button hx-post="/settings/resources/clusters/{{ cluster.id }}/delete/"
+                hx-target="#cluster-{{ cluster.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Hard delete cluster '{{ cluster.name }}' and all its data?"
+                style="background:transparent;border:none;color:#f87171;cursor:pointer;padding:0">Delete</button>
+      </div>
+      {% endif %}
+    </div>
+    <span id="cluster-status-{{ cluster.id }}" style="display:none"></span>
+    {% if cluster.nodes.all %}
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b">
+      {% for node in cluster.nodes.all %}
+      <div id="node-{{ node.id }}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <span style="font-family:monospace;color:#94a3b8;font-size:.75rem">&#x21B3; {{ node.hostname }}</span>
+        <div style="display:flex;align-items:center;gap:10px;font-size:.7rem">
+          <span style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:#4ade80;padding:1px 6px;border-radius:8px">{{ node.status }}</span>
+          {% if is_admin %}
+          <button hx-post="/settings/resources/nodes/{{ node.id }}/deactivate/"
+                  hx-target="#node-{{ node.id }}"
+                  hx-swap="innerHTML"
+                  style="background:transparent;border:none;color:#fbbf24;cursor:pointer;padding:0">Deactivate</button>
+          <button hx-post="/settings/resources/nodes/{{ node.id }}/delete/"
+                  hx-target="#node-{{ node.id }}"
+                  hx-swap="outerHTML"
+                  hx-confirm="Delete node {{ node.hostname }}?"
+                  style="background:transparent;border:none;color:#f87171;cursor:pointer;padding:0">Delete</button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}
+    <p style="color:#475569;font-size:.78rem;margin-bottom:16px">No active clusters.</p>
+  {% endfor %}
+
+  {% if is_admin %}
+  <form method="post" action="/settings/resources/clusters/create/" style="margin-top:14px;display:flex;gap:10px;align-items:flex-end">
+    {% csrf_token %}
+    <div>
+      <label style="display:block;font-size:.65rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Cluster name</label>
+      <input name="name" type="text" placeholder="e.g. prod-cluster-1"
+             style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 12px;border-radius:4px;font-size:.8rem">
+    </div>
+    <button type="submit" style="background:#76B900;color:#000;font-weight:700;font-family:monospace;font-size:.75rem;padding:7px 14px;border:none;border-radius:4px;cursor:pointer">
+      + Add Cluster
+    </button>
+  </form>
+  {% endif %}
+
+{% endif %}
 {% endblock %}

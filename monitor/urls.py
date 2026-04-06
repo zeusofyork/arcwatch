@@ -9,6 +9,9 @@ from monitor.views.settings_views import (
     settings_root, settings_api_keys, settings_alert_rules,
     settings_resources, settings_members, revoke_api_key,
     create_alert_rule, toggle_alert_rule, delete_alert_rule,
+    create_cluster, deactivate_cluster, delete_cluster,
+    deactivate_node, delete_node,
+    create_endpoint, deactivate_endpoint, delete_endpoint,
 )
 
 app_name = 'monitor'
@@ -29,6 +32,14 @@ urlpatterns = [
     path('settings/alert-rules/<int:rule_id>/toggle/', toggle_alert_rule, name='toggle_alert_rule'),
     path('settings/alert-rules/<int:rule_id>/delete/', delete_alert_rule, name='delete_alert_rule'),
     path('settings/resources/', settings_resources, name='settings_resources'),
+    path('settings/resources/clusters/create/', create_cluster, name='create_cluster'),
+    path('settings/resources/clusters/<uuid:cluster_id>/deactivate/', deactivate_cluster, name='deactivate_cluster'),
+    path('settings/resources/clusters/<uuid:cluster_id>/delete/', delete_cluster, name='delete_cluster'),
+    path('settings/resources/nodes/<uuid:node_id>/deactivate/', deactivate_node, name='deactivate_node'),
+    path('settings/resources/nodes/<uuid:node_id>/delete/', delete_node, name='delete_node'),
+    path('settings/resources/endpoints/create/', create_endpoint, name='create_endpoint'),
+    path('settings/resources/endpoints/<uuid:endpoint_id>/deactivate/', deactivate_endpoint, name='deactivate_endpoint'),
+    path('settings/resources/endpoints/<uuid:endpoint_id>/delete/', delete_endpoint, name='delete_endpoint'),
     path('settings/members/', settings_members, name='settings_members'),
 
     # ── REST API ──────────────────────────────────────────────────────────────

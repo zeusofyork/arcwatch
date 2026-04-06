@@ -236,3 +236,39 @@ class AlertRulesPageTest(TestCase):
         self.client.login(username='ar_other2', password='pw')
         response = self.client.post(f'/settings/alert-rules/{self.rule.id}/delete/')
         self.assertEqual(response.status_code, 404)
+
+
+class ResourcesPageTest(TestCase):
+    def setUp(self):
+        self.admin, self.org = _make_user_and_org('res_admin', role='owner')
+        self.viewer = User.objects.create_user(username='res_viewer', password='pw')
+        self.viewer.profile.organization = self.org
+        self.viewer.profile.role = 'viewer'
+        self.viewer.profile.save()
+
+    def test_create_cluster(self):
+        self.client.login(username='res_admin', password='pw')
+        response = self.client.post('/settings/resources/clusters/create/', {'name': 'prod-cluster'})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(GPUCluster.objects_unscoped.filter(name='prod-cluster', organization=self.org).exists())
+
+    def test_deactivate_cluster(self):
+        self.client.login(username='res_admin', password='pw')
+        cluster = GPUCluster.objects_unscoped.create(organization=self.org, name='to-deactivate')
+        response = self.client.post(f'/settings/resources/clusters/{cluster.id}/deactivate/')
+        self.assertEqual(response.status_code, 200)
+        cluster.refresh_from_db()
+        self.assertFalse(cluster.is_active)
+
+    def test_deactivate_cluster_viewer_gets_403(self):
+        self.client.login(username='res_viewer', password='pw')
+        cluster = GPUCluster.objects_unscoped.create(organization=self.org, name='cluster-v')
+        response = self.client.post(f'/settings/resources/clusters/{cluster.id}/deactivate/')
+        self.assertEqual(response.status_code, 403)
+
+    def test_delete_cluster(self):
+        self.client.login(username='res_admin', password='pw')
+        cluster = GPUCluster.objects_unscoped.create(organization=self.org, name='to-delete')
+        response = self.client.post(f'/settings/resources/clusters/{cluster.id}/delete/')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(GPUCluster.objects_unscoped.filter(pk=cluster.id).exists())
