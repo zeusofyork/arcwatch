@@ -1,6 +1,7 @@
 """
 monitor/models/organization.py -- Organization, Team, UserProfile, and APIKey models.
 """
+import datetime
 import hashlib
 import secrets
 import uuid
@@ -198,3 +199,57 @@ class APIKey(models.Model):
         cls.objects.filter(pk=api_key.pk).update(last_used_at=timezone.now())
         api_key.refresh_from_db(fields=['last_used_at'])
         return api_key
+
+
+# ── Invite ─────────────────────────────────────────────────────────────────
+
+class Invite(models.Model):
+    """
+    Email-based invitation for a new member to join an organization.
+    Token is a UUID used as the one-time accept link. Expires after 7 days.
+    """
+    ROLE_CHOICES = [
+        ('viewer', 'Viewer'),
+        ('admin', 'Admin'),
+        ('owner', 'Owner'),
+    ]
+
+    token = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name='invites',
+    )
+    invited_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='sent_invites',
+    )
+    email = models.EmailField()
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='viewer')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'accepted_at']),
+            models.Index(fields=['email']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + datetime.timedelta(days=7)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Invite({self.email} → {self.organization.slug})"
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_accepted(self):
+        return self.accepted_at is not None
+
+    @property
+    def is_pending(self):
+        return not self.is_accepted and not self.is_expired

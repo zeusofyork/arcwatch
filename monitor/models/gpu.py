@@ -38,6 +38,7 @@ class GPUCluster(models.Model):
         help_text='kubectl context name for this cluster',
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     objects = TenantManager()
     objects_unscoped = models.Manager()
@@ -97,6 +98,7 @@ class GPUNode(models.Model):
     )
     last_seen = models.DateTimeField(default=timezone.now, db_index=True)
     agent_version = models.CharField(max_length=50, blank=True, default='')
+    is_active = models.BooleanField(default=True, db_index=True)
 
     objects = TenantManager()
     objects_unscoped = models.Manager()
