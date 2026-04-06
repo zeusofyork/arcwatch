@@ -27,7 +27,7 @@ class LLMProviderModelTest(TestCase):
 
     def test_provider_str(self):
         p = LLMProvider(organization=self.org, provider="openai", label="My Key")
-        self.assertIn("openai", str(p))
+        self.assertIn("OpenAI", str(p))
         self.assertIn("My Key", str(p))
 
 

@@ -24,9 +24,12 @@ class LLMProvider(models.Model):
     class Meta:
         ordering = ["-created_at"]
         verbose_name = "LLM Provider"
+        indexes = [
+            models.Index(fields=["organization", "is_active"]),
+        ]
 
     def __str__(self):
-        return f"{self.get_provider_display()} ({self.provider}) — {self.label}"
+        return f"{self.get_provider_display()} — {self.label}"
 
     @property
     def api_key_masked(self):
@@ -57,6 +60,9 @@ class LLMUsageRecord(models.Model):
         unique_together = [("date", "organization", "provider", "model")]
         ordering = ["-date", "provider", "model"]
         verbose_name = "LLM Usage Record"
+        indexes = [
+            models.Index(fields=["organization", "date"]),
+        ]
 
     def __str__(self):
         return f"{self.date} {self.provider}/{self.model} ${self.cost_usd}"
